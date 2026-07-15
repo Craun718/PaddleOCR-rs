@@ -1,13 +1,59 @@
+use log::warn;
+
+/// Result of CTC decoding containing the recognized text and confidence score.
+///
+/// Produced by the CTC greedy decoder from raw model output probabilities.
+///
+/// # Example
+///
+/// ```ignore
+/// // Typically obtained from OcrEngine::recognize_text
+/// let decoded = engine.recognize_text(&image, &region)?;
+/// println!("Text: {}, Score: {:.2}", decoded.text, decoded.score);
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
 #[derive(Debug, Clone)]
 pub struct DecodedText {
+    /// The decoded text string.
     pub text: String,
+    /// Average confidence score of the recognized characters in `[0.0, 1.0]`.
     pub score: f32,
 }
 
-use log::warn;
-
-/// CTC decode: blank=0, characters start at index 1.
-/// Collapse repeats, remove blanks, and average kept character scores.
+/// CTC (Connectionist Temporal Classification) greedy decoder.
+///
+/// Decodes the raw probability output from the recognition model into text by:
+/// 1. Taking the argmax at each timestep
+/// 2. Collapsing repeated characters
+/// 3. Removing the blank token (index 0)
+/// 4. Computing the average confidence of kept characters
+///
+/// # Arguments
+///
+/// * `probs` — Model output probabilities, shape `[timesteps, num_classes]`.
+///   Each inner vector is the softmax output for one timestep.
+/// * `keys` — Character dictionary, one character per element. Index 0 is
+///   reserved for the blank token; `keys[0]` maps to class index 1.
+///
+/// # Returns
+///
+/// A [`DecodedText`] with the recognized text and average confidence score.
+///
+/// # Example
+///
+/// ```ignore
+/// use paddleocr_rs_onnx::decode::ctc_decode;
+///
+/// // Simulated model output: 3 timesteps, 5 classes (blank + 4 chars)
+/// let probs = vec![
+///     vec![0.1, 0.7, 0.1, 0.05, 0.05],  // timestep 0 -> 'H'
+///     vec![0.05, 0.05, 0.8, 0.05, 0.05], // timestep 1 -> 'i'
+///     vec![0.9, 0.02, 0.02, 0.03, 0.03], // timestep 2 -> blank
+/// ];
+/// let keys = vec!["H".into(), "i".into(), "!".into(), "x".into()];
+/// let result = ctc_decode(&probs, &keys);
+/// assert_eq!(result.text, "Hi");
+/// ```
 pub fn ctc_decode(probs: &[Vec<f32>], keys: &[String]) -> DecodedText {
     let blank_idx = 0;
     let mut text = String::new();
@@ -42,7 +88,7 @@ pub fn ctc_decode(probs: &[Vec<f32>], keys: &[String]) -> DecodedText {
             keys.len(),
             probs.iter()
                 .flat_map(|t| t.iter().enumerate())
-                .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+                .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
                 .map(|(idx, _)| idx)
                 .unwrap_or(0),
         );

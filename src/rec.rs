@@ -1,3 +1,14 @@
+//! Text recognition module using SVTR/CRNN.
+//!
+//! Recognizes text within detected regions by:
+//!
+//! 1. **Preprocess** — Perspective rectification, resize to model input dimensions
+//! 2. **Inference** — Run the recognition model to produce per-timestep class probabilities
+//! 3. (Decoding is handled by [`crate::decode::ctc_decode`])
+//!
+//! The module also provides geometric utilities for quadrilateral validation
+//! and perspective transformation.
+
 use crate::error::PaddleOcrError;
 
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -18,7 +29,9 @@ fn cross2d(a: [f32; 2], b: [f32; 2], c: [f32; 2]) -> f32 {
 }
 
 /// Signed area of a quadrilateral using the shoelace formula.
+///
 /// Negative area indicates clockwise (self-intersecting / concave) ordering.
+/// Absolute value gives the actual area.
 fn quad_area(pts: &[[f32; 2]; 4]) -> f32 {
     let mut area = 0.0f32;
     for i in 0..4 {
@@ -71,6 +84,9 @@ fn is_valid_quad(bbox: &[[f32; 2]; 4]) -> bool {
     true
 }
 
+/// Order bounding box points as top-left, top-right, bottom-right, bottom-left.
+///
+/// Uses sum/difference heuristics to identify corners.
 fn order_bbox_points(bbox: [[f32; 2]; 4]) -> [[f32; 2]; 4] {
     let mut rect = [[0.0; 2]; 4];
 
@@ -112,6 +128,30 @@ fn order_bbox_points(bbox: [[f32; 2]; 4]) -> [[f32; 2]; 4] {
     rect
 }
 
+/// Preprocess a text region for recognition.
+///
+/// Performs perspective rectification on the quadrilateral bounding box,
+/// resizes the result to the model's expected input dimensions, and
+/// normalizes pixel values.
+///
+/// # Arguments
+///
+/// * `image` — The original image.
+/// * `region` — The [`TextRegion`] to preprocess.
+/// * `rec_height` — Target height for the recognition model input.
+/// * `rec_width` — Optional fixed width; if `None`, width is computed from
+///   the aspect ratio of the rectified region.
+///
+/// # Returns
+///
+/// A tuple of `(flattened_chw_data, input_width)` where `flattened_chw_data`
+/// is the normalized CHW-format pixel data and `input_width` is the actual
+/// width used for the model input tensor.
+///
+/// # Errors
+///
+/// Returns [`PaddleOcrError::DegenerateRegion`] if the bounding box is invalid,
+/// or [`PaddleOcrError::Projection`] if the perspective transformation fails.
 pub fn preprocess_region(
     image: &DynamicImage,
     region: &TextRegion,
@@ -217,6 +257,28 @@ pub fn preprocess_region(
     Ok((data, input_w as i64))
 }
 
+/// Run the recognition model on preprocessed image data.
+///
+/// Executes the ONNX inference and returns the raw per-timestep class
+/// probabilities for CTC decoding.
+///
+/// # Arguments
+///
+/// * `session` — The ONNX runtime session loaded with the recognition model.
+/// * `data` — Flattened CHW-format image data from [`preprocess_region`].
+/// * `width` — Width of the input tensor (from [`preprocess_region`]).
+/// * `height` — Height of the input tensor (`rec_height`).
+/// * `input_name` — Name of the model's input tensor.
+/// * `output_name` — Name of the model's output tensor.
+///
+/// # Returns
+///
+/// A vector of timestep vectors, where each inner vector contains class
+/// probabilities for that timestep. Shape: `[timesteps, num_classes]`.
+///
+/// # Errors
+///
+/// Returns [`PaddleOcrError::Inference`] if the model execution fails.
 pub fn run_recognition(
     session: &mut Session,
     data: &[f32],

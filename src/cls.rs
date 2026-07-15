@@ -1,3 +1,15 @@
+//! Document orientation classification using PP-LCNet_x1_0_doc_ori model.
+//!
+//! Classifies the orientation of document images into four classes:
+//! 0 (upright), 90, 180, and 270 degrees. Useful for preprocessing
+//! scanned documents or photos where the capture orientation is unknown.
+//!
+//! The preprocessing pipeline is:
+//! 1. Resize so the short edge equals 256 pixels
+//! 2. Center crop to 224x224
+//! 3. Normalize with ImageNet mean/std
+//! 4. Convert to CHW format
+
 use crate::error::PaddleOcrError;
 
 // Document orientation classification using PP-LCNet_x1_0_doc_ori ONNX model.
@@ -9,6 +21,17 @@ use image::{DynamicImage, RgbImage};
 use ort::session::Session;
 
 /// Document orientation angles classified by the model.
+///
+/// The model outputs one of four rotation classes representing the
+/// original orientation of the document before any rotation was applied.
+///
+/// # Example
+///
+/// ```ignore
+/// let orientation = DocOrientation::from_class_index(2);
+/// assert_eq!(orientation, DocOrientation::Rotate180);
+/// assert_eq!(orientation.angle(), 180);
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DocOrientation {
     /// Document is upright (0° rotation needed)
@@ -23,6 +46,8 @@ pub enum DocOrientation {
 
 impl DocOrientation {
     /// Get the rotation angle in degrees.
+    ///
+    /// Returns 0, 90, 180, or 270.
     pub fn angle(&self) -> u32 {
         match self {
             DocOrientation::Upright => 0,
@@ -45,6 +70,16 @@ impl DocOrientation {
 }
 
 /// Result of document orientation classification.
+///
+/// Contains the detected orientation and the classifier's confidence score.
+///
+/// # Example
+///
+/// ```ignore
+/// let result = classifier.classify(&image)?;
+/// println!("Orientation: {:?}, confidence: {:.2}", result.orientation, result.confidence);
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
 #[derive(Debug, Clone)]
 pub struct OrientationResult {
     /// The detected orientation.
@@ -122,6 +157,11 @@ fn preprocess(image: &DynamicImage) -> Result<Vec<f32>, PaddleOcrError> {
 }
 
 /// Apply softmax to logits and get the predicted class.
+///
+/// # Returns
+///
+/// A tuple of `(predicted_class_index, confidence_score)`.
+
 fn softmax_argmax(logits: &[f32]) -> (usize, f32) {
     // Compute softmax
     let max_logit = logits.iter().copied().fold(f32::NEG_INFINITY, f32::max);
@@ -141,13 +181,30 @@ fn softmax_argmax(logits: &[f32]) -> (usize, f32) {
 /// Run orientation classification on an image.
 ///
 /// # Arguments
-/// * `session` - ONNX runtime session for the orientation model
-/// * `image` - Input image to classify
-/// * `input_name` - Name of the input tensor in the ONNX model
-/// * `output_name` - Name of the output tensor in the ONNX model
+///
+/// * `session` — ONNX runtime session for the orientation model.
+/// * `image` — Input image to classify.
+/// * `input_name` — Name of the input tensor in the ONNX model.
+/// * `output_name` — Name of the output tensor in the ONNX model.
 ///
 /// # Returns
-/// * `OrientationResult` containing the detected orientation and confidence
+///
+/// An [`OrientationResult`] containing the detected orientation and confidence.
+///
+/// # Errors
+///
+/// Returns [`PaddleOcrError::Preprocessing`] if the image has zero dimensions,
+/// or [`PaddleOcrError::Inference`] if the model execution fails.
+///
+/// # Example
+///
+/// ```ignore
+/// let mut session = /* loaded ONNX session */;
+/// let image = image::open("scan.png")?;
+/// let result = classify_orientation(&mut session, &image, "input", "output")?;
+/// println!("Detected: {:?} ({:.0}%)", result.orientation, result.confidence * 100.0);
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
 pub fn classify_orientation(
     session: &mut Session,
     image: &DynamicImage,

@@ -1,3 +1,48 @@
+//! # PaddleOCR-rs
+//!
+//! An ONNX-based OCR engine using PaddleOCR models, providing text detection,
+//! text recognition, and document orientation classification.
+//!
+//! ## Features
+//!
+//! - **Text Detection** -- Locates text regions in images using DBNet
+//! - **Text Recognition** -- Recognizes text within detected regions using SVTR/CRNN
+//! - **Document Orientation Classification** -- Detects document rotation (0, 90, 180, 270 degrees)
+//! - **Hardware Acceleration** -- Supports CUDA, DirectML, OpenVINO, NNAPI, CoreML, and CANN
+//! - **Concurrent Recognition** -- Parallel text recognition with a session pool
+//!
+//! ## Quick Start
+//!
+//! ```ignore
+//! use paddleocr_rs_onnx::OcrEngine;
+//!
+//! let det_model = std::fs::read("ch_PP-OCRv4_det_infer.onnx")?;
+//! let rec_model = std::fs::read("ch_PP-OCRv4_rec_infer.onnx")?;
+//! let keys = std::fs::read("ppocr_keys_v1.txt")?;
+//!
+//! let engine = OcrEngine::new(&det_model, &rec_model, &keys)?;
+//! let image = image::open("test.png")?;
+//! let results = engine.recognize_all(&image, paddleocr_rs_onnx::OrderBy::Horizontal)?;
+//!
+//! for block in &results {
+//!     println!("{} (confidence: {:.2})", block.text, block.confidence);
+//! }
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! ## Feature Flags
+//!
+//! | Feature      | Description                              |
+//! |--------------|------------------------------------------|
+//! | `cuda`       | NVIDIA CUDA GPU acceleration             |
+//! | `directml`   | Windows DirectML GPU acceleration        |
+//! | `openvino`   | Intel OpenVINO acceleration              |
+//! | `nnapi`      | Android NNAPI acceleration               |
+//! | `coreml`     | Apple CoreML acceleration                |
+//! | `cann`       | Huawei CANN / Ascend NPU acceleration    |
+//!
+//! No hardware acceleration features are enabled by default (CPU-only).
+//!
 use parking_lot::{Mutex, Condvar};
 use std::collections::VecDeque;
 use rayon::prelude::*;
@@ -11,30 +56,88 @@ mod error;
 pub use error::PaddleOcrError;
 
 pub use cls::{DocOrientation, OrientationResult, classify_orientation};
+pub use decode::DecodedText;
 
 use image::DynamicImage;
 use serde::{Deserialize, Serialize};
 
+/// A detected text region in an image.
+///
+/// Contains the bounding box coordinates (as four corner points) and a confidence
+/// score from the text detection model. The four points are ordered as
+/// top-left, top-right, bottom-right, bottom-left.
+///
+/// # Example
+///
+/// ```ignore
+/// let region = TextRegion {
+///     bbox: [[10.0, 20.0], [100.0, 20.0], [100.0, 50.0], [10.0, 50.0]],
+///     confidence: 0.95,
+/// };
+/// assert!(region.confidence > 0.9);
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TextRegion {
+    /// Four corner points of the bounding box: `[[x, y]; 4]`.
+    /// Ordered as top-left, top-right, bottom-right, bottom-left.
     pub bbox: [[f32; 2]; 4],
+    /// Detection confidence score in the range `[0.0, 1.0]`.
     pub confidence: f32,
 }
 
+/// A recognized text block with position and confidence information.
+///
+/// Produced by the full OCR pipeline ([`OcrEngine::recognize_all`]), each block
+/// contains the recognized text, its confidence score, and an axis-aligned
+/// bounding rectangle in the original image coordinates.
+///
+/// # Example
+///
+/// ```ignore
+/// let block = OcrBlock {
+///     text: "Hello".to_string(),
+///     confidence: 0.98,
+///     x: 10.0,
+///     y: 20.0,
+///     width: 200.0,
+///     height: 40.0,
+/// };
+/// assert_eq!(block.text, "Hello");
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OcrBlock {
+    /// The recognized text content.
     pub text: String,
+    /// Recognition confidence score in the range `[0.0, 1.0]`.
     pub confidence: f32,
+    /// X coordinate of the top-left corner of the bounding rectangle (in pixels).
     pub x: f32,
+    /// Y coordinate of the top-left corner of the bounding rectangle (in pixels).
     pub y: f32,
+    /// Width of the bounding rectangle (in pixels).
     pub width: f32,
+    /// Height of the bounding rectangle (in pixels).
     pub height: f32,
 }
 
+/// Ordering strategy for OCR text blocks.
+///
+/// Controls how detected and recognized text blocks are sorted in the output
+/// of [`OcrEngine::recognize_all`].
+///
+/// # Example
+///
+/// ```ignore
+/// let results = engine.recognize_all(&image, OrderBy::Horizontal)?;
+/// // Results are sorted top-to-bottom, then left-to-right
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum OrderBy {
+    /// Sort by Y coordinate first, then by X coordinate (top-to-bottom, left-to-right).
     Horizontal,
+    /// Sort by X coordinate first, then by Y coordinate (left-to-right, top-to-bottom).
     Vertical,
+    /// Sort by recognition confidence, highest first.
     Score,
 }
 
@@ -89,9 +192,23 @@ impl std::fmt::Display for AccelerationDevice {
 impl AccelerationDevice {
     /// Parse a device string (case-insensitive).
     ///
-    /// Supported values: "cpu", "cuda"/"nvidia", "directml"/"dml",
-    /// "openvino"/"open-vino"/"ov", "nnapi", "coreml"/"apple",
-    /// "cann"/"ascend"/"huawei".
+    /// Supported values: `"cpu"`, `"cuda"`/`"nvidia"`, `"directml"`/`"dml"`,
+    /// `"openvino"`/`"open-vino"`/`"ov"`, `"nnapi"`, `"coreml"`/`"apple"`,
+    /// `"cann"`/`"ascend"`/`"huawei"`.
+    ///
+    /// # Returns
+    ///
+    /// `Some(device)` if the string is recognized, `None` otherwise.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use paddleocr_rs_onnx::AccelerationDevice;
+    ///
+    /// assert_eq!(AccelerationDevice::from_str_loose("CUDA"), Some(AccelerationDevice::Cuda));
+    /// assert_eq!(AccelerationDevice::from_str_loose("nvidia"), Some(AccelerationDevice::Cuda));
+    /// assert_eq!(AccelerationDevice::from_str_loose("unknown"), None);
+    /// ```
     pub fn from_str_loose(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "cpu" => Some(Self::Cpu),
@@ -186,6 +303,38 @@ fn configure_session_builder(
     }
 }
 
+/// The main OCR engine combining text detection and recognition.
+///
+/// `OcrEngine` manages ONNX sessions for both the detection model (DBNet) and
+/// the recognition model (SVTR/CRNN). It maintains a pool of recognition sessions
+/// for concurrent inference across multiple detected text regions.
+///
+/// # Thread Safety
+///
+/// `OcrEngine` is `Send + Sync`. The internal sessions are protected by mutexes,
+/// and the recognition session pool uses a `Condvar` for efficient blocking when
+/// all sessions are in use.
+///
+/// # Example
+///
+/// ```ignore
+/// use paddleocr_rs_onnx::{OcrEngine, OrderBy};
+///
+/// let det_model = std::fs::read("ch_PP-OCRv4_det_infer.onnx")?;
+/// let rec_model = std::fs::read("ch_PP-OCRv4_rec_infer.onnx")?;
+/// let keys = std::fs::read("ppocr_keys_v1.txt")?;
+///
+/// let engine = OcrEngine::new(&det_model, &rec_model, &keys)?;
+///
+/// let image = image::open("screenshot.png")?;
+/// let blocks = engine.recognize_all(&image, OrderBy::Horizontal)?;
+///
+/// for block in &blocks {
+///     println!("[{:.0},{:.0}] {} ({:.0}%)",
+///         block.x, block.y, block.text, block.confidence * 100.0);
+/// }
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
 pub struct OcrEngine {
     det_session: Mutex<ort::session::Session>,
     rec_sessions: Mutex<VecDeque<ort::session::Session>>,
@@ -201,10 +350,71 @@ pub struct OcrEngine {
 }
 
 impl OcrEngine {
+    /// Create a new OCR engine with default (CPU) acceleration.
+    ///
+    /// # Arguments
+    ///
+    /// * `det_model` -- Raw bytes of the detection ONNX model (e.g., `ch_PP-OCRv4_det_infer.onnx`).
+    /// * `rec_model` -- Raw bytes of the recognition ONNX model (e.g., `ch_PP-OCRv4_rec_infer.onnx`).
+    /// * `keys_data` -- UTF-8 bytes of the character dictionary file (e.g., `ppocr_keys_v1.txt`),
+    ///   one character per line.
+    ///
+    /// # Returns
+    ///
+    /// A ready-to-use [`OcrEngine`] instance.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PaddleOcrError::Model`] if any model fails to load, or
+    /// [`PaddleOcrError::General`] if the keys file is not valid UTF-8.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let det_model = std::fs::read("ch_PP-OCRv4_det_infer.onnx")?;
+    /// let rec_model = std::fs::read("ch_PP-OCRv4_rec_infer.onnx")?;
+    /// let keys = std::fs::read("ppocr_keys_v1.txt")?;
+    /// let engine = OcrEngine::new(&det_model, &rec_model, &keys)?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
     pub fn new(det_model: &[u8], rec_model: &[u8], keys_data: &[u8]) -> Result<Self, PaddleOcrError> {
         Self::new_with_device(det_model, rec_model, keys_data, AccelerationDevice::default())
     }
 
+    /// Create a new OCR engine with a specific hardware acceleration device.
+    ///
+    /// If the requested acceleration device is unavailable, the engine falls back
+    /// to CPU inference with a warning logged.
+    ///
+    /// # Arguments
+    ///
+    /// * `det_model` -- Raw bytes of the detection ONNX model.
+    /// * `rec_model` -- Raw bytes of the recognition ONNX model.
+    /// * `keys_data` -- UTF-8 bytes of the character dictionary file.
+    /// * `device` -- The desired [`AccelerationDevice`] for inference.
+    ///
+    /// # Returns
+    ///
+    /// A ready-to-use [`OcrEngine`] instance.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any model fails to load or the keys data is invalid.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use paddleocr_rs_onnx::{OcrEngine, AccelerationDevice};
+    ///
+    /// let det_model = std::fs::read("ch_PP-OCRv4_det_infer.onnx")?;
+    /// let rec_model = std::fs::read("ch_PP-OCRv4_rec_infer.onnx")?;
+    /// let keys = std::fs::read("ppocr_keys_v1.txt")?;
+    /// let engine = OcrEngine::new_with_device(
+    ///     &det_model, &rec_model, &keys,
+    ///     AccelerationDevice::Cuda,
+    /// )?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
     pub fn new_with_device(
         det_model: &[u8],
         rec_model: &[u8],
@@ -290,15 +500,91 @@ impl OcrEngine {
     }
 
     /// Returns the acceleration device used by this engine.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use paddleocr_rs_onnx::AccelerationDevice;
+    ///
+    /// # let det = std::fs::read("det.onnx").unwrap();
+    /// # let rec = std::fs::read("rec.onnx").unwrap();
+    /// # let keys = std::fs::read("keys.txt").unwrap();
+    /// let engine = OcrEngine::new_with_device(&det, &rec, &keys, AccelerationDevice::Cuda)?;
+    /// assert_eq!(engine.device(), AccelerationDevice::Cuda);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
     pub fn device(&self) -> AccelerationDevice {
         self.device
     }
 
+    /// Detect text regions in an image.
+    ///
+    /// Runs the DBNet detection model to find bounding boxes around text areas.
+    /// This is a low-level method; prefer [`recognize_all`] for the full pipeline.
+    ///
+    /// # Arguments
+    ///
+    /// * `image` -- The input image to analyze.
+    ///
+    /// # Returns
+    ///
+    /// A vector of [`TextRegion`] instances, one per detected text area, sorted
+    /// by detection confidence.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PaddleOcrError::Inference`] if the model execution fails, or
+    /// [`PaddleOcrError::Preprocessing`] if image preprocessing fails.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let image = image::open("document.png")?;
+    /// let regions = engine.detect_text_regions(&image)?;
+    /// println!("Found {} text regions", regions.len());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// [`recognize_all`]: OcrEngine::recognize_all
     pub fn detect_text_regions(&self, image: &DynamicImage) -> Result<Vec<TextRegion>, PaddleOcrError> {
         let mut session = self.det_session.lock();
         det::detect_text_regions(&mut session, image, &self.det_input, &self.det_output)
     }
 
+    /// Recognize text within a single detected region.
+    ///
+    /// Performs perspective rectification on the region, runs the recognition model,
+    /// and decodes the output using CTC decoding. This is a low-level method;
+    /// prefer [`recognize_all`] for the full pipeline.
+    ///
+    /// # Arguments
+    ///
+    /// * `image` -- The original image.
+    /// * `region` -- A [`TextRegion`] obtained from [`detect_text_regions`].
+    ///
+    /// # Returns
+    ///
+    /// A [`DecodedText`] containing the recognized text and its confidence score.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PaddleOcrError::DegenerateRegion`] if the bounding box is too small
+    /// or degenerate, [`PaddleOcrError::Projection`] if perspective rectification fails,
+    /// or [`PaddleOcrError::Inference`] if the model execution fails.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let regions = engine.detect_text_regions(&image)?;
+    /// if let Some(region) = regions.first() {
+    ///     let decoded = engine.recognize_text(&image, region)?;
+    ///     println!("Text: {} (score: {:.2})", decoded.text, decoded.score);
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// [`detect_text_regions`]: OcrEngine::detect_text_regions
+    /// [`recognize_all`]: OcrEngine::recognize_all
     pub fn recognize_text(&self, image: &DynamicImage, region: &TextRegion) -> Result<decode::DecodedText, PaddleOcrError> {
         let (data, width) = rec::preprocess_region(image, region, self.rec_height, self.rec_width)?;
 
@@ -327,7 +613,53 @@ impl OcrEngine {
     }
 
     /// Complete OCR pipeline: detection + recognition.
-    /// `order` controls the output ordering of text blocks.
+    ///
+    /// Detects all text regions in the image, recognizes text in each region
+    /// concurrently using a session pool, and returns the results sorted
+    /// according to the specified ordering.
+    ///
+    /// When no text regions are detected, falls back to treating the entire
+    /// image as a single text region.
+    ///
+    /// # Arguments
+    ///
+    /// * `image` -- The input image to process.
+    /// * `order` -- The [`OrderBy`] strategy for sorting the output blocks.
+    ///
+    /// # Returns
+    ///
+    /// A vector of [`OcrBlock`] instances, each containing the recognized text,
+    /// confidence, and bounding rectangle.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if detection or recognition fails for a non-degenerate region.
+    /// Degenerate regions are silently skipped.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use paddleocr_rs_onnx::{OcrEngine, OrderBy};
+    ///
+    /// # let det = std::fs::read("det.onnx").unwrap();
+    /// # let rec = std::fs::read("rec.onnx").unwrap();
+    /// # let keys = std::fs::read("keys.txt").unwrap();
+    /// let engine = OcrEngine::new(&det, &rec, &keys)?;
+    /// let image = image::open("screenshot.png")?;
+    ///
+    /// // Read top-to-bottom, left-to-right
+    /// let blocks = engine.recognize_all(&image, OrderBy::Horizontal)?;
+    /// for block in &blocks {
+    ///     println!("{}", block.text);
+    /// }
+    ///
+    /// // Or sort by confidence
+    /// let blocks = engine.recognize_all(&image, OrderBy::Score)?;
+    /// if let Some(best) = blocks.first() {
+    ///     println!("Most confident: {} ({:.0}%)", best.text, best.confidence * 100.0);
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
     pub fn recognize_all(&self, image: &DynamicImage, order: OrderBy) -> Result<Vec<OcrBlock>, PaddleOcrError> {
         let regions = self.detect_text_regions(image)?;
 
@@ -425,6 +757,9 @@ impl OcrEngine {
     }
 }
 
+/// Convert a quadrilateral bounding box to an axis-aligned rectangle.
+///
+/// Returns `(x, y, width, height)` where `(x, y)` is the top-left corner.
 fn bbox_to_rect(bbox: &[[f32; 2]; 4]) -> (f32, f32, f32, f32) {
     let min_x = bbox.iter().map(|p| p[0]).reduce(f32::min).unwrap_or(0.0);
     let min_y = bbox.iter().map(|p| p[1]).reduce(f32::min).unwrap_or(0.0);
@@ -462,11 +797,61 @@ impl DocOrientationClassifier {
     ///
     /// # Returns
     /// A new classifier instance ready to classify images.
+    /// Create a new orientation classifier from ONNX model data.
+    ///
+    /// Uses the default CPU acceleration device. To use a specific device,
+    /// see [`new_with_device`](Self::new_with_device).
+    ///
+    /// # Arguments
+    ///
+    /// * `model_data` -- Raw ONNX model bytes (e.g., `PP-LCNet_x1_0_doc_ori.onnx`).
+    ///
+    /// # Returns
+    ///
+    /// A new classifier instance ready to classify images.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PaddleOcrError::Model`] if the model fails to load.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let model_data = std::fs::read("PP-LCNet_x1_0_doc_ori.onnx")?;
+    /// let classifier = DocOrientationClassifier::new(&model_data)?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
     pub fn new(model_data: &[u8]) -> Result<Self, PaddleOcrError> {
         Self::new_with_device(model_data, AccelerationDevice::default())
     }
 
     /// Create a new orientation classifier with a specific acceleration device.
+    ///
+    /// # Arguments
+    ///
+    /// * `model_data` -- Raw ONNX model bytes.
+    /// * `device` -- The desired [`AccelerationDevice`] for inference.
+    ///
+    /// # Returns
+    ///
+    /// A new classifier instance ready to classify images.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PaddleOcrError::Model`] if the model fails to load.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use paddleocr_rs_onnx::{DocOrientationClassifier, AccelerationDevice};
+    ///
+    /// let model_data = std::fs::read("PP-LCNet_x1_0_doc_ori.onnx")?;
+    /// let classifier = DocOrientationClassifier::new_with_device(
+    ///     &model_data,
+    ///     AccelerationDevice::Cuda,
+    /// )?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
     pub fn new_with_device(model_data: &[u8], device: AccelerationDevice) -> Result<Self, PaddleOcrError> {
         info!("[doc_ori] creating classifier with device: {}", device);
 
@@ -517,16 +902,35 @@ impl DocOrientationClassifier {
         cls::classify_orientation(&mut session, image, &self.input_name, &self.output_name)
     }
 
-    /// Rotate the image to correct its orientation.
+    /// Classify and correct the orientation of a document image.
     ///
-    /// This is a convenience method that classifies the orientation and
-    /// returns a correctly oriented image.
+    /// This is a convenience method that classifies the orientation and returns
+    /// a correctly oriented image in a single call.
     ///
     /// # Arguments
-    /// * `image` - The document image to correct
+    ///
+    /// * `image` -- The document image to correct.
     ///
     /// # Returns
-    /// A tuple of (corrected_image, orientation_result).
+    ///
+    /// A tuple of `(corrected_image, orientation_result)`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if classification or image rotation fails.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let model_data = std::fs::read("PP-LCNet_x1_0_doc_ori.onnx")?;
+    /// let classifier = DocOrientationClassifier::new(&model_data)?;
+    /// let image = image::open("scan.png")?;
+    ///
+    /// let (corrected, result) = classifier.correct_orientation(&image)?;
+    /// corrected.save("corrected.png")?;
+    /// println!("Detected {} degrees rotation, corrected.", result.orientation.angle());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
     pub fn correct_orientation(&self, image: &DynamicImage) -> Result<(DynamicImage, OrientationResult), PaddleOcrError> {
         let result = self.classify(image)?;
 

@@ -1,3 +1,13 @@
+//! Text detection module using DBNet.
+//!
+//! Detects text regions in images by producing probability maps and finding
+//! contours. The pipeline is:
+//!
+//! 1. **Preprocess** — Resize, pad to multiple of 32, normalize with ImageNet mean/std
+//! 2. **Inference** — Run DBNet to produce a per-pixel probability map
+//! 3. **Postprocess** — Threshold, find contours, compute minimum rotated boxes,
+//!    filter by size and confidence, expand with unclip ratio
+
 use crate::error::PaddleOcrError;
 
 use geo::algorithm::buffer::BufferStyle;
@@ -283,6 +293,27 @@ fn average_probability(prob_data: &[f32], w: usize, h: usize, poly: &[[f32; 2]; 
     }
 }
 
+/// Detect text regions in an image using the DBNet detection model.
+///
+/// Runs the full detection pipeline: preprocessing, ONNX inference, and
+/// postprocessing (contour finding, minimum rotated box, filtering).
+///
+/// # Arguments
+///
+/// * `session` — The ONNX runtime session loaded with the detection model.
+/// * `image` — The input image to process.
+/// * `input_name` — Name of the model's input tensor.
+/// * `output_name` — Name of the model's output tensor.
+///
+/// # Returns
+///
+/// A vector of [`TextRegion`] instances, each with a quadrilateral bounding box
+/// and detection confidence score.
+///
+/// # Errors
+///
+/// Returns [`PaddleOcrError::Preprocessing`] if image preprocessing fails,
+/// or [`PaddleOcrError::Inference`] if the model execution fails.
 pub fn detect_text_regions(
     session: &mut Session,
     image: &DynamicImage,
