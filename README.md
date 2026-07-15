@@ -173,3 +173,146 @@ This project is built upon the work of the following projects:
 - [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) - Provides models
 - [FastDeploy](https://github.com/PaddlePaddle/FastDeploy) - Provides runtime reference
 - [MAAFramework](https://github.com/MaaAssistantArknights/MAAFramework) - Provides architecture reference
+
+## Comparison with Other Rust PaddleOCR Implementations
+
+This project is one of several Rust implementations of PaddleOCR. Below is a comprehensive comparison of the three main implementations:
+
+### Overview
+
+| Aspect | This project (PaddleOCR-rs) | [mg-chao/paddle-ocr-rs](https://github.com/mg-chao/paddle-ocr-rs) | [zibo-chen/rust-paddle-ocr](https://github.com/zibo-chen/rust-paddle-ocr) |
+|--------|------------------------------|------------------------|---------------------------|
+| **Inference backend** | ONNX Runtime via ort crate (pure Rust, no FFI) | ONNX Runtime via ort crate | MNN inference framework via mnn-rs crate |
+| **Document orientation classification** | Included (PP-LCNet model, auto rotation correction) | Included (PP-OCR mobile v2.0, 180° rotation) | Included (PP-LCNet model, 0/90/180/270° + 0/180°) |
+| **Model format** | Standard ONNX format | Standard ONNX format | MNN model format |
+| **Architecture** | Pure Rust with ONNX Runtime | Rust + ONNX Runtime | Rust + MNN bindings |
+| **External dependencies** | Minimal dependency set (ort + core crates, no extra download logic) | Full-featured set (ort with explicit download-binaries + YAML/JSON/reqwest etc.) | MNN library (via mnn-rs) |
+| **API design** | OcrEngine with fine-grained control: detect_text_regions, recognize_text, recognize_all | Rich pipeline API with YAML config, auto model download, word-level boxes | Multi-level API: Det/Rec, OcrEngine, C API |
+| **Model loading** | Loads ONNX models directly from byte slices | Loads ONNX models (auto-download from ModelScope) | Loads MNN models from file paths |
+| **Concurrency** | rayon for parallel processing + session pooling | rayon for parallel processing + batch inference | Mainly single-threaded (rayon in pre/post-processing) |
+| **Image processing** | image + imageproc crates | Pure Rust image processing (or optional OpenCV) | Rust-native (image + imageproc + ndarray) |
+| **Dependencies** | Minimal: ort, image, imageproc, geo, serde, rayon, log, parking_lot | ort + many crates (rayon, nalgebra, geo, serde_yaml, reqwest, turbojpeg) | mnn-rs + many crates (image, imageproc, ndarray, rayon, libc) |
+| **Error handling** | Result types with detailed error messages | thiserror-based PaddleOcrError enum (14 variants) | thiserror-based OcrError enum (11 variants) |
+| **Platform support** | Cross-platform (ONNX Runtime supports Windows, Linux, macOS) | Cross-platform (ONNX Runtime supports Windows, Linux, macOS) | Cross-platform (MNN supports Windows, Linux, macOS, Android, iOS) |
+| **Build complexity** | Simple cargo build | Simple cargo build (auto-downloads ONNX Runtime) | Requires MNN setup |
+| **Deployment** | Single binary, no external libs | Requires ONNX Runtime (auto-downloaded) | Requires MNN runtime |
+| **Model portability** | Standard ONNX format | Standard ONNX format | MNN format (needs conversion) |
+| **Ease of use** | Simple API, minimal setup | Simple setup with auto model download | Requires MNN setup |
+| **Performance** | Optimized via ONNX Runtime | Optimized via ONNX Runtime | MNN framework performance |
+| **Maintenance** | Active development | Active development (v0.7.0) | Community maintained |
+| **Ecosystem** | ⚠️ Limited (ONNX only) | ⚠️ Limited (ONNX, RapidOCR) | ⚠️ Limited (MNN only) |
+| **GPU Acceleration** | ❌ Not enabled | ✅ CUDA/DirectML/CANN (via ort features) | ✅ Metal/OpenCL/OpenGL/Vulkan/CUDA/CoreML (6 backends) |
+| **External Interfaces** | ❌ Rust API only | ✅ YAML config + CLI (rapidocr) | ✅ C API (cdylib) + CLI (newbee-ocr-cli) |
+| **Output Formats** | ❌ Plain text only | ✅ JSON + Markdown + Visualization image | ❌ Plain text only |
+| **Text Processing** | ✅ Sorting modes (Horizontal/Vertical/Score) | ✅ Word-level boxes + BiDi text | ✅ FP16 inference + async support |
+
+### Advantages of Each Project
+
+| Project | Key Advantages |
+|---------|----------------|
+| **This project (PaddleOCR-rs)** | ✅ Cross-platform support (Windows, Linux, macOS)<br>✅ No external dependencies (only ONNX models)<br>✅ Document orientation classification<br>✅ Fine-grained API control<br>✅ Concurrent processing with session pooling<br>✅ Multiple ordering modes<br>✅ Full image recognition fallback |
+| **mg-chao/paddle-ocr-rs** | ✅ Rich pipeline API with YAML configuration<br>✅ ONNX Runtime inference with auto model download<br>✅ Word-level bounding boxes<br>✅ Batch processing (recognition + classification)<br>✅ Multiple output formats (JSON, Markdown, visualization)<br>✅ RapidOCR ecosystem compatibility |
+| **zibo-chen/rust-paddle-ocr** | ✅ MNN inference for efficient deployment<br>✅ Multi-level API (Det/Rec, OcrEngine, C API)<br>✅ Cross-language C bindings via cbindgen<br>✅ Partial parallel preprocessing<br>✅ CLI tool included<br>✅ Support for PP-OCR models converted to MNN |
+
+### Detailed Comparison
+
+#### Functionality Differences
+
+| Feature | This project (PaddleOCR-rs) | mg-chao/paddle-ocr-rs | zibo-chen/rust-paddle-ocr |
+|---------|------------------------------|------------------------|---------------------------|
+| **Text Detection** | ✅ DBNet implementation | ✅ DBNet implementation | ✅ DBNet implementation |
+| **Text Recognition** | ✅ CRNN implementation | ✅ CRNN implementation | ✅ CRNN implementation |
+| **Document Orientation** | ✅ PP-LCNet classifier (0/90/180/270°) | ✅ PP-OCR v2.0 classifier (0/180°) | ✅ PP-LCNet classifier (0/90/180/270° + 0/180°) |
+| **Batch Processing** | ✅ Parallel processing with rayon | ✅ Batch inference (rec:6, cls:6) | ⚠️ Partially rayon in pre/post |
+| **Session Management** | ✅ Session pooling for concurrency | ❌ Not available | ❌ Not available |
+| **Image Preprocessing** | ✅ Rust-native image processing | ✅ Pure Rust (or optional OpenCV) | ✅ Rust-native (imageproc, ndarray) |
+| **Model Format Support** | ✅ ONNX only | ✅ ONNX format | ✅ MNN format |
+| **API Granularity** | ✅ Fine-grained control | ✅ Rich pipeline control | ✅ Multi-level (raw to high-level) |
+| **Error Handling** | ✅ Detailed error messages | ✅ Detailed thiserror enum | ✅ Detailed thiserror enum |
+
+#### Performance Differences
+
+| Aspect | This project (PaddleOCR-rs) | mg-chao/paddle-ocr-rs | zibo-chen/rust-paddle-ocr |
+|--------|------------------------------|------------------------|---------------------------|
+| **Inference Speed** | Good (ONNX Runtime optimized) | Good (ONNX Runtime optimized) | Good (MNN framework) |
+| **Memory Usage** | Moderate (Rust safety overhead) | Moderate (Rust overhead) | Moderate |
+| **Startup Time** | Fast (No PaddlePaddle loading) | Fast (auto-downloaded ONNX Runtime) | Slower (MNN initialization) |
+| **Parallel Processing** | ✅ Excellent (rayon + session pooling) | ✅ Available (rayon + batch inference) | ⚠️ Partial (rayon in pre/post) |
+| **Batch Processing** | ✅ Excellent (Parallel execution) | ✅ Available (batch rec & cls) | ❌ Not available |
+| **Resource Efficiency** | Good (Rust safety guarantees) | Good (Rust safety guarantees) | Good (MNN performance) |
+
+#### Capability Differences
+
+| Capability | This project (PaddleOCR-rs) | mg-chao/paddle-ocr-rs | zibo-chen/rust-paddle-ocr |
+|------------|------------------------------|------------------------|---------------------------|
+| **Cross-platform** | ✅ Excellent (ONNX Runtime) | ✅ Excellent (ONNX Runtime) | ✅ Good (MNN support) |
+| **Easy Deployment** | ✅ Excellent (Single binary) | ✅ Good (auto-download) | ⚠️ Requires MNN setup |
+| **Model Flexibility** | ✅ Good (ONNX standard) | ✅ Good (ONNX standard) | ⚠️ Limited to MNN format |
+| **Developer Experience** | ✅ Good (Rust API) | ✅ Good (YAML config, auto-download) | ✅ Good (multi-level API, CLI) |
+| **Documentation** | ✅ Good | ✅ Excellent | ✅ Good |
+| **Community Support** | Growing | Active | Growing |
+
+#### Technical Implementation
+
+| Aspect | This project (PaddleOCR-rs) | mg-chao/paddle-ocr-rs | zibo-chen/rust-paddle-ocr |
+|--------|------------------------------|------------------------|---------------------------|
+| **Language Safety** | ✅ Memory-safe Rust | ✅ Memory-safe Rust | ✅ Memory-safe Rust (mnn-rs) + ⚠️ C API |
+| **Type Safety** | ✅ Strong typing | ✅ Strong typing | ✅ Strong typing |
+| **Error Propagation** | ✅ Rust Result types | ✅ Rust Result types (thiserror) | ✅ Rust Result types (thiserror) |
+| **Memory Management** | ✅ Automatic (Rust) | ✅ Automatic (Rust) | ✅ Automatic (Rust) |
+| **Concurrency Safety** | ✅ Thread-safe by design | ✅ Thread-safe (Arc + Mutex) | ⚠️ Requires careful handling |
+| **API Design** | ✅ Modern Rust idioms | ✅ Modern Rust idioms | ✅ Modern Rust + C API |
+
+### Dependencies Comparison
+
+| Category | This project | mg-chao/paddle-ocr-rs | zibo-chen/rust-paddle-ocr |
+|----------|--------------|------------------------|---------------------------|
+| **OCR Core** | ort (ONNX Runtime) | ort (ONNX Runtime) | mnn (MNN framework) |
+| **Image Processing** | image, imageproc | Pure Rust (custom) or optional OpenCV | image, imageproc, ndarray |
+| **Geometry** | geo | geo-clipper, geo-types, nalgebra | libc |
+| **Concurrency** | rayon, parking_lot | rayon, num_cpus | rayon, crossbeam-channel |
+| **Serialization** | serde | serde, serde_json, serde_yaml | serde, serde_json |
+| **Logging** | log | log | log |
+
+### Summary
+
+**This project (PaddleOCR-rs)** excels in:
+- Cross-platform compatibility and easy deployment
+- No external dependencies (only ONNX models needed)
+- Advanced features including orientation classification (0/90/180/270°)
+- Fine-grained API control and concurrent processing
+- Memory safety and type safety with Rust
+
+**mg-chao/paddle-ocr-rs** excels in:
+- Rich pipeline API with YAML configuration and auto model download
+- ONNX Runtime inference with batch processing
+- Word-level bounding boxes and BiDi text support
+- Multiple output formats (JSON, Markdown, visualization)
+- RapidOCR compatibility and established documentation
+
+**zibo-chen/rust-paddle-ocr** excels in:
+- MNN inference framework for efficient deployment
+- Multi-level API (raw Det/Rec, OcrEngine, C bindings)
+- Cross-language C API via cbindgen
+- CLI tool for direct OCR recognition
+- Partial parallel preprocessing for performance
+
+### Use Case Recommendations
+
+| Use Case | Recommended Project |
+|----------|---------------------|
+| Cross-platform deployment | **PaddleOCR-rs** |
+| Minimal dependencies | **PaddleOCR-rs** |
+| Advanced OCR features (orientation, etc.) | **PaddleOCR-rs** |
+| Rich pipeline with auto model download | **mg-chao/paddle-ocr-rs** |
+| Batch recognition and classification | **mg-chao/paddle-ocr-rs** |
+| Multi-language OCR with BiDi support | **mg-chao/paddle-ocr-rs** |
+| Lightweight deployment on mobile | **zibo-chen/rust-paddle-ocr** |
+| Cross-language C/C++ integration | **zibo-chen/rust-paddle-ocr** |
+
+For the latest features and updates, please refer to the respective repositories.
+
+### Note
+
+The original repository may have evolved since this fork was created. For the latest features, please refer to the [upstream repository](https://github.com/mg-chao/paddle-ocr-rs).
+
