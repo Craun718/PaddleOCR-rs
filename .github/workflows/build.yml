@@ -70,10 +70,85 @@ jobs:
             - name: Build
               run: cargo build --locked
 
+    build-android:
+        name: Android (${{ matrix.target }})
+        needs: check
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                target:
+                    - aarch64-linux-android
+                    - armv7-linux-androideabi
+                    - x86_64-linux-android
+        steps:
+            - uses: actions/checkout@v7
+
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@stable
+              with:
+                  targets: ${{ matrix.target }}
+
+            - name: Cache cargo registry & build
+              uses: actions/cache@v6
+              with:
+                  path: |
+                      ~/.cargo/registry
+                      ~/.cargo/git
+                      target
+                  key: ${{ runner.os }}-android-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+                  restore-keys: |
+                      ${{ runner.os }}-android-${{ matrix.target }}-
+
+            - name: Install Android NDK
+              uses: nttld/setup-ndk@v1
+              with:
+                  ndk-version: r26b
+
+            - name: Set up Android environment
+              run: |
+                  echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME" >> $GITHUB_ENV
+                  echo "NDK_HOME=$ANDROID_NDK_HOME" >> $GITHUB_ENV
+
+            - name: Build
+              run: cargo build --locked --target ${{ matrix.target }} --features ffi
+
+    build-ios:
+        name: iOS (${{ matrix.target }})
+        needs: check
+        runs-on: macos-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                target:
+                    - aarch64-apple-ios
+                    - aarch64-apple-ios-sim
+        steps:
+            - uses: actions/checkout@v7
+
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@stable
+              with:
+                  targets: ${{ matrix.target }}
+
+            - name: Cache cargo registry & build
+              uses: actions/cache@v6
+              with:
+                  path: |
+                      ~/.cargo/registry
+                      ~/.cargo/git
+                      target
+                  key: ${{ runner.os }}-ios-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+                  restore-keys: |
+                      ${{ runner.os }}-ios-${{ matrix.target }}-
+
+            - name: Build
+              run: cargo build --locked --target ${{ matrix.target }} --features ffi
+
     release:
         name: Release
         if: startsWith(github.ref, 'refs/tags/v')
-        needs: [check, build]
+        needs: [check, build, build-android, build-ios]
         runs-on: ubuntu-latest
         permissions:
             contents: write
@@ -133,6 +208,43 @@ jobs:
                     -C target/aarch64-apple-darwin/release \
                     paddleocr_rs_onnx
 
+            # ---------- Android aarch64 ----------
+            - uses: dtolnay/rust-toolchain@stable
+              with:
+                  targets: aarch64-linux-android
+
+            - name: Install Android NDK
+              uses: nttld/setup-ndk@v1
+              with:
+                  ndk-version: r26b
+
+            - name: Build Android release
+              run: cargo build --locked --release --target aarch64-linux-android --features ffi
+
+            - name: Package Android
+              shell: bash
+              run: |
+                  TAG="${{ steps.tag.outputs.tag }}"
+                  tar -czf "release/paddleocr-rs-${TAG}-aarch64-android.tar.gz" \
+                    -C target/aarch64-linux-android/release \
+                    libpaddleocr_rs_onnx.so
+
+            # ---------- iOS aarch64 ----------
+            - uses: dtolnay/rust-toolchain@stable
+              with:
+                  targets: aarch64-apple-ios
+
+            - name: Build iOS release
+              run: cargo build --locked --release --target aarch64-apple-ios --features ffi
+
+            - name: Package iOS
+              shell: bash
+              run: |
+                  TAG="${{ steps.tag.outputs.tag }}"
+                  tar -czf "release/paddleocr-rs-${TAG}-aarch64-ios.tar.gz" \
+                    -C target/aarch64-apple-ios/release \
+                    libpaddleocr_rs_onnx.a
+
             # ---------- Source tarball ----------
             - name: Package source
               shell: bash
@@ -148,5 +260,3 @@ jobs:
               with:
                   generate_release_notes: true
                   files: release/*
-
-

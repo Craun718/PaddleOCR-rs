@@ -188,6 +188,61 @@ paddleocr_rs_onnx = { version = "0.1", features = ["cuda", "directml"] }
 ```
 
 ## Usage
+
+## 移动平台支持
+
+PaddleOCR-rs 通过 C FFI 接口支持 Android 和 iOS 平台。
+
+### Android
+
+- **CPU**: ✅ 支持（通过 ONNX Runtime）
+- **NNAPI**: ✅ 支持（通过 
+napi feature）
+- **目标平台**: arch64-linux-android, rmv7-linux-androideabi, x86_64-linux-android
+
+### iOS
+
+- **CPU**: ✅ 支持（通过 ONNX Runtime）
+- **CoreML**: ✅ 支持（通过 coreml feature）
+- **目标平台**: arch64-apple-ios, arch64-apple-ios-sim
+
+### 构建移动端版本
+
+#### 使用构建脚本：
+
+`ash
+# Android
+./build-android.sh aarch64-linux-android --release
+
+# iOS
+./build-ios.sh aarch64-apple-ios --release
+`
+
+#### 直接使用 Cargo：
+
+`ash
+# Android ARM64
+cargo build --release --target aarch64-linux-android --features ffi
+
+# iOS ARM64
+cargo build --release --target aarch64-apple-ios --features ffi
+`
+
+### FFI 接口
+
+启用 fi feature 以暴露 C 兼容 API：
+
+`	oml
+[dependencies]
+paddleocr_rs_onnx = { version = "0.2", features = ["ffi"] }
+`
+
+完整的 FFI API 文档请参见 src/ffi.rs。
+
+### 示例项目
+
+- xamples/android-demo/ - Android Kotlin 示例
+- xamples/ios-demo/ - iOS Swift 示例
 ## 使用方法
 
 ```rust
@@ -289,3 +344,5 @@ MIT
 | **内存/类型安全**  | ✅ 内存安全 Rust + 强类型 + 自动内存管理                      | ✅ 内存安全 Rust + 强类型                                         | ✅ 内存安全 Rust（mnn-rs）+ ⚠️ C API 部分                                 |
 | **错误处理与 API** | ✅ Rust Result 类型 + 现代惯用法                              | ✅ Rust Result 类型（thiserror）                                  | ✅ Rust Result 类型（thiserror）                                          |
 | **并发安全性**     | ✅ 设计上就是线程安全的                                       | ✅ 线程安全（Arc + Mutex）                                        | ⚠️ 需要小心处理                                                           |
+
+

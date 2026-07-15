@@ -14,6 +14,10 @@ openvino = ["ort/openvino"]
 nnapi = ["ort/nnapi"]
 coreml = ["ort/coreml"]
 cann = ["ort/cann"]
+ffi = []
+
+[lib]
+crate-type = ["lib", "cdylib"]
 
 [dependencies]
 ort = "2.0.0-rc.12"

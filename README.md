@@ -233,6 +233,61 @@ paddleocr_rs_onnx = { version = "0.1", features = ["cuda", "directml"] }
 }
 ```
 
+
+## Mobile Platform Support
+
+PaddleOCR-rs supports Android and iOS platforms via C FFI interface.
+
+### Android
+
+- **CPU**: ✅ Supported (via ONNX Runtime)
+- **NNAPI**: ✅ Supported (via 
+napi feature)
+- **Targets**: arch64-linux-android, rmv7-linux-androideabi, x86_64-linux-android
+
+### iOS
+
+- **CPU**: ✅ Supported (via ONNX Runtime)
+- **CoreML**: ✅ Supported (via coreml feature)
+- **Targets**: arch64-apple-ios, arch64-apple-ios-sim
+
+### Building for Mobile
+
+#### Using build scripts:
+
+`ash
+# Android
+./build-android.sh aarch64-linux-android --release
+
+# iOS
+./build-ios.sh aarch64-apple-ios --release
+`
+
+#### Using Cargo directly:
+
+`ash
+# Android ARM64
+cargo build --release --target aarch64-linux-android --features ffi
+
+# iOS ARM64
+cargo build --release --target aarch64-apple-ios --features ffi
+`
+
+### FFI Interface
+
+Enable the fi feature to expose C-compatible API:
+
+`	oml
+[dependencies]
+paddleocr_rs_onnx = { version = "0.2", features = ["ffi"] }
+`
+
+See src/ffi.rs for the complete FFI API documentation.
+
+### Example Projects
+
+- xamples/android-demo/ - Android Kotlin example
+- xamples/ios-demo/ - iOS Swift example
 ## Usage
 
 ```rust
@@ -325,7 +380,7 @@ This project is one of several Rust implementations of PaddleOCR. Below is a com
 | **Image processing** | image + imageproc crates | Pure Rust image processing (or optional OpenCV) | Rust-native (image + imageproc + ndarray) |
 | **Dependencies** | Minimal: ort, image, imageproc, geo, serde, rayon, log, parking_lot | ort + many crates (rayon, nalgebra, geo, serde_yaml, reqwest, turbojpeg) | mnn-rs + many crates (image, imageproc, ndarray, rayon, libc) |
 | **Error handling** | Result types with detailed error messages | thiserror-based PaddleOcrError enum (14 variants) | thiserror-based OcrError enum (11 variants) |
-| **Platform support** | Cross-platform (ONNX Runtime supports Windows, Linux, macOS) | Cross-platform (ONNX Runtime supports Windows, Linux, macOS) | Cross-platform (MNN supports Windows, Linux, macOS, Android, iOS) |
+| **Platform support** | Cross-platform (Windows, Linux, macOS, Android, iOS) | Cross-platform (ONNX Runtime supports Windows, Linux, macOS) | Cross-platform (MNN supports Windows, Linux, macOS, Android, iOS) |
 | **Build complexity** | Simple cargo build | Simple cargo build (auto-downloads ONNX Runtime) | Requires MNN setup |
 | **Deployment** | Single binary, no external libs | Requires ONNX Runtime (auto-downloaded) | Requires MNN runtime |
 | **Model portability** | Standard ONNX format | Standard ONNX format | MNN format (needs conversion) |
@@ -377,7 +432,7 @@ This project is one of several Rust implementations of PaddleOCR. Below is a com
 
 | Capability | This project (PaddleOCR-rs) | mg-chao/paddle-ocr-rs | zibo-chen/rust-paddle-ocr |
 |------------|------------------------------|------------------------|---------------------------|
-| **Cross-platform** | ✅ Excellent (ONNX Runtime) | ✅ Excellent (ONNX Runtime) | ✅ Good (MNN support) |
+| **Cross-platform** | ✅ Excellent (ONNX Runtime + FFI for mobile) | ✅ Excellent (ONNX Runtime) | ✅ Good (MNN support) |
 | **Easy Deployment** | ✅ Excellent (Single binary) | ✅ Good (auto-download) | ⚠️ Requires MNN setup |
 | **Model Flexibility** | ✅ Good (ONNX standard) | ✅ Good (ONNX standard) | ⚠️ Limited to MNN format |
 | **Developer Experience** | ✅ Good (Rust API) | ✅ Good (YAML config, auto-download) | ✅ Good (multi-level API, CLI) |
@@ -447,5 +502,8 @@ For the latest features and updates, please refer to the respective repositories
 ### Note
 
 The original repository may have evolved since this fork was created. For the latest features, please refer to the [upstream repository](https://github.com/mg-chao/paddle-ocr-rs).
+
+
+
 
 

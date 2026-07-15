@@ -48,7 +48,7 @@ use std::collections::VecDeque;
 use rayon::prelude::*;
 use log::{info, warn};
 
-mod det;
+mod det;#[cfg(feature = "ffi")] pub mod ffi;
 mod decode;
 mod rec;
 mod cls;
@@ -472,7 +472,15 @@ impl OcrEngine {
         let cores = std::thread::available_parallelism()
             .map(|n| n.get())
             .unwrap_or(2);
-        let pool_size = (cores / 2).max(1);
+                // Mobile optimization: use smaller pool size on Android/iOS
+        let pool_size = {
+            #[cfg(target_os = "android")]
+            { 1 }
+            #[cfg(target_os = "ios")]
+            { 1 }
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            { (cores / 2).max(1) }
+        };
         info!("[ocr] creating rec session pool of size {} (cores={})", pool_size, cores);
 
         let mut sessions = VecDeque::with_capacity(pool_size);
@@ -953,4 +961,5 @@ impl DocOrientationClassifier {
         Ok((corrected, result))
     }
 }
+
 
