@@ -1,0 +1,17 @@
+[package]
+name = "paddleocr_rs_onnx"
+version = "0.1.0"
+edition = "2021"
+repository = "https://github.com/Craun718/PaddleOCR-rs"
+license = "MIT"
+description = "ONNX-based OCR engine using PaddleOCR models (text detection, recognition, orientation classification)"
+
+[dependencies]
+ort = "2.0.0-rc.12"
+image = "0.25"
+imageproc = "0.27"
+geo = "0.33"
+serde = { version = "1", features = ["derive"] }
+rayon = "1"
+log = "0.4"
+parking_lot = "0.12"
