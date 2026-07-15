@@ -108,6 +108,13 @@ jobs:
                   echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME" >> $GITHUB_ENV
                   echo "NDK_HOME=$ANDROID_NDK_HOME" >> $GITHUB_ENV
 
+            - name: Configure Android linker
+              run: |
+                  mkdir -p .cargo
+                  printf '[target.aarch64-linux-android]\nlinker = "%s/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android35-clang"\n' "$ANDROID_NDK_HOME" > .cargo/config.toml
+                  echo "Created .cargo/config.toml:"
+                  cat .cargo/config.toml
+
             - name: Build
               run: cargo build --locked --target ${{ matrix.target }} --features ffi
 
@@ -216,6 +223,13 @@ jobs:
               with:
                   ndk-version: r26b
 
+            - name: Configure Android linker (release)
+              run: |
+                  mkdir -p .cargo
+                  printf '[target.aarch64-linux-android]\nlinker = "%s/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android35-clang"\n' "$ANDROID_NDK_HOME" > .cargo/config.toml
+                  echo "Created .cargo/config.toml:"
+                  cat .cargo/config.toml
+
             - name: Build Android release
               run: cargo build --locked --release --target aarch64-linux-android --features ffi
 
@@ -258,4 +272,7 @@ jobs:
               with:
                   generate_release_notes: true
                   files: release/*
+
+
+
 
