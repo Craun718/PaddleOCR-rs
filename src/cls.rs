@@ -1,7 +1,9 @@
-//! Document orientation classification using PP-LCNet_x1_0_doc_ori ONNX model.
-//!
-//! This module provides functionality to classify the orientation of document images.
-//! The model outputs 4 classes representing rotation angles: 0°, 90°, 180°, 270°.
+use crate::error::PaddleOcrError;
+
+// Document orientation classification using PP-LCNet_x1_0_doc_ori ONNX model.
+//
+// This module provides functionality to classify the orientation of document images.
+// The model outputs 4 classes representing rotation angles: 0°, 90°, 180°, 270°.
 
 use image::{DynamicImage, RgbImage};
 use ort::session::Session;
@@ -65,10 +67,10 @@ const STD: [f32; 3] = [0.229, 0.224, 0.225];
 /// 2. Center crop to CROP_SIZE x CROP_SIZE (224x224)
 /// 3. Normalize with ImageNet mean/std
 /// 4. Convert to CHW format
-fn preprocess(image: &DynamicImage) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
+fn preprocess(image: &DynamicImage) -> Result<Vec<f32>, PaddleOcrError> {
     let (orig_w, orig_h) = (image.width(), image.height());
     if orig_w == 0 || orig_h == 0 {
-        return Err("Image has zero dimensions".into());
+        return Err(PaddleOcrError::Image { message: "Image has zero dimensions".to_string() });
     }
 
     // Step 1: Resize by short edge
@@ -151,7 +153,7 @@ pub fn classify_orientation(
     image: &DynamicImage,
     input_name: &str,
     output_name: &str,
-) -> Result<OrientationResult, Box<dyn std::error::Error>> {
+) -> Result<OrientationResult, PaddleOcrError> {
     let data = preprocess(image)?;
 
     // Create input tensor: [1, 3, 224, 224]
@@ -208,3 +210,6 @@ mod tests {
         assert!(prob > 0.5); // Class 2 should have highest confidence
     }
 }
+
+
+

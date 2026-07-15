@@ -7,6 +7,8 @@ mod det;
 mod decode;
 mod rec;
 mod cls;
+mod error;
+pub use error::PaddleOcrError;
 
 pub use cls::{DocOrientation, OrientationResult, classify_orientation};
 
@@ -50,7 +52,7 @@ pub struct OcrEngine {
 }
 
 impl OcrEngine {
-    pub fn new(det_model: &[u8], rec_model: &[u8], keys_data: &[u8]) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(det_model: &[u8], rec_model: &[u8], keys_data: &[u8]) -> Result<Self, PaddleOcrError> {
         let det_session = ort::session::Session::builder()?
             .commit_from_memory(det_model)?;
         let rec_session = ort::session::Session::builder()?
@@ -125,15 +127,13 @@ impl OcrEngine {
         })
     }
 
-    pub fn detect_text_regions(&self, image: &DynamicImage) -> Result<Vec<TextRegion>, String> {
+    pub fn detect_text_regions(&self, image: &DynamicImage) -> Result<Vec<TextRegion>, PaddleOcrError> {
         let mut session = self.det_session.lock();
         det::detect_text_regions(&mut session, image, &self.det_input, &self.det_output)
-            .map_err(|e| e.to_string())
     }
 
-    pub fn recognize_text(&self, image: &DynamicImage, region: &TextRegion) -> Result<decode::DecodedText, String> {
-        let (data, width) = rec::preprocess_region(image, region, self.rec_height, self.rec_width)
-            .map_err(|e| e.to_string())?;
+    pub fn recognize_text(&self, image: &DynamicImage, region: &TextRegion) -> Result<decode::DecodedText, PaddleOcrError> {
+        let (data, width) = rec::preprocess_region(image, region, self.rec_height, self.rec_width)?;
 
         // Pop a session from the pool, blocking until one is available
         let mut session = {
@@ -146,8 +146,7 @@ impl OcrEngine {
             }
         };
 
-        let result = rec::run_recognition(&mut session, &data, width, self.rec_height, &self.rec_input, &self.rec_output)
-            .map_err(|e| e.to_string());
+        let result = rec::run_recognition(&mut session, &data, width, self.rec_height, &self.rec_input, &self.rec_output)?;
 
         // Always return session to pool and notify waiters
         {
@@ -156,11 +155,11 @@ impl OcrEngine {
             self.rec_sessions_cvar.notify_one();
         }
 
-        let probs = result?;
+        let probs = result;
         Ok(decode::ctc_decode(&probs, &self.keys))
     }
 
-    pub fn recognize_all(&self, image: &DynamicImage, order_by: OrderBy) -> Result<Vec<OcrBlock>, String> {
+    pub fn recognize_all(&self, image: &DynamicImage, order_by: OrderBy) -> Result<Vec<OcrBlock>, PaddleOcrError> {
         let regions = self.detect_text_regions(image)?;
         if regions.is_empty() {
             if let Some(block) = self.recognize_full_image(image)? {
@@ -199,7 +198,7 @@ impl OcrEngine {
         Ok(blocks)
     }
 
-    fn recognize_full_image(&self, image: &DynamicImage) -> Result<Option<OcrBlock>, String> {
+    fn recognize_full_image(&self, image: &DynamicImage) -> Result<Option<OcrBlock>, PaddleOcrError> {
         let width = image.width() as f32;
         let height = image.height() as f32;
         if width < 1.0 || height < 1.0 {
@@ -267,7 +266,7 @@ impl DocOrientationClassifier {
     ///
     /// # Returns
     /// A new classifier instance ready to classify images.
-    pub fn new(model_data: &[u8]) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(model_data: &[u8]) -> Result<Self, PaddleOcrError> {
         let session = ort::session::Session::builder()?
             .commit_from_memory(model_data)?;
 
@@ -304,10 +303,9 @@ impl DocOrientationClassifier {
     ///
     /// # Returns
     /// An `OrientationResult` containing the detected orientation and confidence score.
-    pub fn classify(&self, image: &DynamicImage) -> Result<OrientationResult, String> {
+    pub fn classify(&self, image: &DynamicImage) -> Result<OrientationResult, PaddleOcrError> {
         let mut session = self.session.lock();
         cls::classify_orientation(&mut session, image, &self.input_name, &self.output_name)
-            .map_err(|e| e.to_string())
     }
 
     /// Rotate the image to correct its orientation.
@@ -320,7 +318,7 @@ impl DocOrientationClassifier {
     ///
     /// # Returns
     /// A tuple of (corrected_image, orientation_result).
-    pub fn correct_orientation(&self, image: &DynamicImage) -> Result<(DynamicImage, OrientationResult), String> {
+    pub fn correct_orientation(&self, image: &DynamicImage) -> Result<(DynamicImage, OrientationResult), PaddleOcrError> {
         let result = self.classify(image)?;
 
         let corrected = match result.orientation {
@@ -342,3 +340,16 @@ impl DocOrientationClassifier {
         Ok((corrected, result))
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+

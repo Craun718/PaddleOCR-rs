@@ -1,3 +1,5 @@
+use crate::error::PaddleOcrError;
+
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use image::{DynamicImage, RgbImage};
@@ -115,7 +117,7 @@ pub fn preprocess_region(
     region: &TextRegion,
     rec_height: u32,
     rec_width: Option<u32>,
-) -> Result<(Vec<f32>, i64), Box<dyn std::error::Error>> {
+) -> Result<(Vec<f32>, i64), PaddleOcrError> {
     let bbox = order_bbox_points(region.bbox);
 
     // Reject degenerate quads that would produce an ill-conditioned homography
@@ -124,7 +126,7 @@ pub fn preprocess_region(
             "[rec] skipping degenerate bbox: {:?} (area too small or near-collinear)",
             region.bbox
         );
-        return Err("degenerate text region bbox".into());
+        return Err(PaddleOcrError::DegenerateRegion { reason: "degenerate text region bbox".to_string() });
     }
 
     let rw = (point_dist(bbox[0], bbox[1]).max(point_dist(bbox[3], bbox[2])).ceil() as u32).max(1);
@@ -144,7 +146,7 @@ pub fn preprocess_region(
     ];
 
     let proj = Projection::from_control_points(src, dst)
-        .ok_or("Failed to create projection")?;
+        .ok_or(PaddleOcrError::Projection { reason: "Failed to create projection".to_string() })?;
 
     let rgb = image.to_rgb8();
     let mut rectified = RgbImage::new(rw, rh);
@@ -173,7 +175,7 @@ pub fn preprocess_region(
             "[rec] warp panicked for bbox {:?} ({}×{}): {} — skipping region",
             region.bbox, rw, rh, msg
         );
-        return Err(format!("warp failed: {}", msg).into());
+        return Err(PaddleOcrError::Projection { reason: format!("warp failed: {}", msg) });
     }
 
     if rectified.height() as f32 / rectified.width().max(1) as f32 >= 1.5 {
@@ -222,7 +224,7 @@ pub fn run_recognition(
     height: u32,
     input_name: &str,
     output_name: &str,
-) -> Result<Vec<Vec<f32>>, Box<dyn std::error::Error>> {
+) -> Result<Vec<Vec<f32>>, PaddleOcrError> {
     let input_tensor = ort::value::Tensor::from_array((
         [1i64, 3, height as i64, width],
         data.to_vec(),
@@ -302,3 +304,9 @@ mod tests {
         assert_eq!(quad_area(&bbox), 100.0);
     }
 }
+
+
+
+
+
+

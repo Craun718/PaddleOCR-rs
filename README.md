@@ -178,6 +178,36 @@ This project is built upon the work of the following projects:
 
 This project is one of several Rust implementations of PaddleOCR. Below is a comprehensive comparison of the three main implementations:
 
+### Acceleration Hardware Support Comparison
+
+| Platform/Backend     | This project (PaddleOCR-rs) | [mg-chao/paddle-ocr-rs](https://github.com/mg-chao/paddle-ocr-rs) | [zibo-chen/rust-paddle-ocr](https://github.com/zibo-chen/rust-paddle-ocr) |
+| -------------------- | ---------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| **Windows**          |                              |                                                                   |                                                                           |
+| CPU                  | ✅ ONNX Runtime (default)    | ✅ ONNX Runtime (default)                                         | ✅ MNN (default)                                                          |
+| CUDA (NVIDIA)        | ❌ Not enabled               | ✅ CUDA                                                           | ✅ CUDA                                                                   |
+| DirectML (GPU)       | ❌ Not enabled               | ✅ DirectML                                                       | ❌                                                                        |
+| **Linux**            |                              |                                                                   |                                                                           |
+| CPU                  | ✅ ONNX Runtime (default)    | ✅ ONNX Runtime (default)                                         | ✅ MNN (default)                                                          |
+| CUDA (NVIDIA)        | ❌ Not enabled               | ✅ CUDA                                                           | ✅ CUDA                                                                   |
+| CANN (Ascend)        | ❌ Not enabled               | ✅ CANN                                                           | ❌                                                                        |
+| OpenCL               | ❌                           | ❌                                                                | ✅ OpenCL                                                                 |
+| Vulkan               | ❌                           | ❌                                                                | ✅ Vulkan                                                                 |
+| **macOS**            |                              |                                                                   |                                                                           |
+| CPU                  | ✅ ONNX Runtime (default)    | ✅ ONNX Runtime (default)                                         | ✅ MNN (default)                                                          |
+| CoreML (Apple GPU)   | ❌ Not enabled               | ❌                                                                | ✅ CoreML                                                                 |
+| Metal (Apple GPU)    | ❌                           | ❌                                                                | ✅ Metal                                                                  |
+| **Android**          |                              |                                                                   |                                                                           |
+| CPU                  | ❌ Not supported             | ❌ Not supported                                                  | ✅ MNN (default)                                                          |
+| OpenCL               | ❌                           | ❌                                                                | ✅ OpenCL                                                                 |
+| Vulkan               | ❌                           | ❌                                                                | ✅ Vulkan                                                                 |
+| **iOS**              |                              |                                                                   |                                                                           |
+| CPU                  | ❌ Not supported             | ❌ Not supported                                                  | ✅ MNN (default)                                                          |
+| CoreML (Apple GPU)   | ❌                           | ❌                                                                | ✅ CoreML                                                                 |
+| Metal (Apple GPU)    | ❌                           | ❌                                                                | ✅ Metal                                                                  |
+| **Other**            |                              |                                                                   |                                                                           |
+| OpenGL               | ❌                           | ❌                                                                | ✅ OpenGL                                                                 |
+| Accelerator Count    | 0                           | 3 (CUDA + DirectML + CANN)                                        | 6 (CUDA + Metal + CoreML + OpenCL + Vulkan + OpenGL)                     |
+
 ### Overview
 
 | Aspect | This project (PaddleOCR-rs) | [mg-chao/paddle-ocr-rs](https://github.com/mg-chao/paddle-ocr-rs) | [zibo-chen/rust-paddle-ocr](https://github.com/zibo-chen/rust-paddle-ocr) |
@@ -201,7 +231,7 @@ This project is one of several Rust implementations of PaddleOCR. Below is a com
 | **Performance** | Optimized via ONNX Runtime | Optimized via ONNX Runtime | MNN framework performance |
 | **Maintenance** | Active development | Active development (v0.7.0) | Community maintained |
 | **Ecosystem** | ⚠️ Limited (ONNX only) | ⚠️ Limited (ONNX, RapidOCR) | ⚠️ Limited (MNN only) |
-| **GPU Acceleration** | ❌ Not enabled | ✅ CUDA/DirectML/CANN (via ort features) | ✅ Metal/OpenCL/OpenGL/Vulkan/CUDA/CoreML (6 backends) |
+| **GPU Acceleration** | ❌ Not enabled | ✅ CUDA/DirectML/CANN | ✅ Metal/OpenCL/OpenGL/Vulkan/CUDA/CoreML |
 | **External Interfaces** | ❌ Rust API only | ✅ YAML config + CLI (rapidocr) | ✅ C API (cdylib) + CLI (newbee-ocr-cli) |
 | **Output Formats** | ❌ Plain text only | ✅ JSON + Markdown + Visualization image | ❌ Plain text only |
 | **Text Processing** | ✅ Sorting modes (Horizontal/Vertical/Score) | ✅ Word-level boxes + BiDi text | ✅ FP16 inference + async support |
@@ -258,7 +288,7 @@ This project is one of several Rust implementations of PaddleOCR. Below is a com
 |--------|------------------------------|------------------------|---------------------------|
 | **Language Safety** | ✅ Memory-safe Rust | ✅ Memory-safe Rust | ✅ Memory-safe Rust (mnn-rs) + ⚠️ C API |
 | **Type Safety** | ✅ Strong typing | ✅ Strong typing | ✅ Strong typing |
-| **Error Propagation** | ✅ Rust Result types | ✅ Rust Result types (thiserror) | ✅ Rust Result types (thiserror) |
+| **Error Propagation** | ✅ Rust Result types (thiserror) | ✅ Rust Result types (thiserror) | ✅ Rust Result types (thiserror) |
 | **Memory Management** | ✅ Automatic (Rust) | ✅ Automatic (Rust) | ✅ Automatic (Rust) |
 | **Concurrency Safety** | ✅ Thread-safe by design | ✅ Thread-safe (Arc + Mutex) | ⚠️ Requires careful handling |
 | **API Design** | ✅ Modern Rust idioms | ✅ Modern Rust idioms | ✅ Modern Rust + C API |
@@ -315,4 +345,5 @@ For the latest features and updates, please refer to the respective repositories
 ### Note
 
 The original repository may have evolved since this fork was created. For the latest features, please refer to the [upstream repository](https://github.com/mg-chao/paddle-ocr-rs).
+
 

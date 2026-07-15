@@ -1,3 +1,5 @@
+use crate::error::PaddleOcrError;
+
 use geo::algorithm::buffer::BufferStyle;
 use geo::{Area, Buffer, LineString as GeoLineString, MinimumRotatedRect, MultiPolygon, Polygon as GeoPolygon};
 use image::{DynamicImage, GrayImage, Luma};
@@ -16,7 +18,7 @@ const MIN_SIZE: f32 = 3.0;
 const MEAN: [f32; 3] = [0.485, 0.456, 0.406];
 const STD: [f32; 3] = [0.229, 0.224, 0.225];
 
-fn preprocess(image: &DynamicImage) -> Result<(Vec<f32>, i64, i64, f32, f32), Box<dyn std::error::Error>> {
+fn preprocess(image: &DynamicImage) -> Result<(Vec<f32>, i64, i64, f32, f32), PaddleOcrError> {
     let (w, h) = (image.width(), image.height());
     let scale = DET_LONG_SIDE as f32 / w.max(h) as f32;
     let scale = scale.min(1.0);
@@ -286,7 +288,7 @@ pub fn detect_text_regions(
     image: &DynamicImage,
     input_name: &str,
     output_name: &str,
-) -> Result<Vec<TextRegion>, Box<dyn std::error::Error>> {
+) -> Result<Vec<TextRegion>, PaddleOcrError> {
     let (data, padded_h, padded_w, scale_x, scale_y) = preprocess(image)?;
 
     let input_tensor = ort::value::Tensor::from_array((
@@ -303,3 +305,5 @@ pub fn detect_text_regions(
     let regions = postprocess(output_slice, out_h, out_w, image.width(), image.height(), scale_x, scale_y);
     Ok(regions)
 }
+
+
