@@ -1,13 +1,11 @@
 # Build script for PaddleOCR-rs Android targets (Windows)
 # Usage: .\build-android.ps1 [-Target <target>] [-Release] [-Features <features>]
 #
-# Targets:
-#   aarch64-linux-android  (ARM64, default)
-#   armv7-linux-androideabi (ARMv7)
-#   x86_64-linux-android  (x86_64, for emulators)
+# Note: ort-sys only provides prebuilt binaries for aarch64-linux-android.
+# Other Android targets (armv7, x86_64) are NOT supported by ort-sys.
 
 param(
-    [ValidateSet("aarch64-linux-android", "armv7-linux-androideabi", "x86_64-linux-android")]
+    [ValidateSet("aarch64-linux-android")]
     [string]$Target = "aarch64-linux-android",
     
     [switch]$Release,
@@ -30,6 +28,9 @@ Write-Host "Building for Android target: $Target"
 Write-Host "NDK directory: $NDKDir"
 Write-Host "Features: $Features"
 Write-Host "Mode: $(if ($Release) { 'release' } else { 'debug' })"
+Write-Host ""
+Write-Host "Note: Only aarch64-linux-android is supported by ort-sys."
+Write-Host "      armv7-linux-androideabi and x86_64-linux-android are NOT supported."
 
 # Build
 $cargoArgs = @("build")

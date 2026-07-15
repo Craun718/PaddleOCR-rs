@@ -7,40 +7,34 @@ This example demonstrates how to use PaddleOCR-rs in an Android application via 
 ## Prerequisites
 
 1. Android Studio with NDK installed
-2. Rust toolchain with Android targets:
+2. Rust toolchain with Android target:
    ```bash
    rustup target add aarch64-linux-android
-   rustup target add armv7-linux-androideabi
-   rustup target add x86_64-linux-android
    ```
 3. Android NDK (r26b or later recommended)
+
+**Note:** Only `aarch64-linux-android` (ARM64) is supported by ort-sys prebuilt binaries. Other Android targets (armv7, x86_64) are NOT supported.
 
 ## Building the Native Library
 
 ### Using the build script (Linux/macOS):
 
 ```bash
-# Build for ARM64 (most modern devices)
+# Build for ARM64 (only supported target)
 ./build-android.sh aarch64-linux-android --release
-
-# Build for ARMv7 (older devices)
-./build-android.sh armv7-linux-androideabi --release
-
-# Build for x86_64 (emulators)
-./build-android.sh x86_64-linux-android --release
 ```
 
 ### Using the PowerShell script (Windows):
 
 ```powershell
-# Build for ARM64
+# Build for ARM64 (only supported target)
 .\build-android.ps1 -Target aarch64-linux-android -Release
+```
 
-# Build for ARMv7
-.\build-android.ps1 -Target armv7-linux-androideabi -Release
+### Using Cargo directly:
 
-# Build for x86_64
-.\build-android.ps1 -Target x86_64-linux-android -Release
+```bash
+cargo build --release --target aarch64-linux-android --features ffi
 ```
 
 ## Project Structure
@@ -54,11 +48,7 @@ android-demo/
 │   │   │   │   ├── MainActivity.kt
 │   │   │   │   └── PaddleOcrBridge.kt
 │   │   │   ├── jniLibs/
-│   │   │   │   ├── arm64-v8a/
-│   │   │   │   │   └── libpaddleocr_rs_onnx.so
-│   │   │   │   ├── armeabi-v7a/
-│   │   │   │   │   └── libpaddleocr_rs_onnx.so
-│   │   │   │   └── x86_64/
+│   │   │   │   └── arm64-v8a/
 │   │   │   │       └── libpaddleocr_rs_onnx.so
 │   │   │   ├── assets/
 │   │   │   │   ├── ch_PP-OCRv4_det_infer.onnx
@@ -224,8 +214,8 @@ Note: NNAPI support varies by device and Android version. The engine will fallba
 ## Troubleshooting
 
 ### "Library not found" error
-- Ensure the `.so` file is in the correct `jniLibs` directory
-- Check that the ABI matches your device/emulator
+- Ensure the `.so` file is in the correct `jniLibs/arm64-v8a/` directory
+- Check that your device is ARM64 (most modern Android devices are)
 
 ### "Model load failed" error
 - Verify model files are in the assets directory

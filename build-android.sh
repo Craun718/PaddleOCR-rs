@@ -2,10 +2,8 @@
 # Build script for PaddleOCR-rs Android targets
 # Usage: ./build-android.sh [target] [--release]
 #
-# Targets:
-#   aarch64-linux-android  (ARM64, default)
-#   armv7-linux-androideabi (ARMv7)
-#   x86_64-linux-android  (x86_64, for emulators)
+# Note: ort-sys only provides prebuilt binaries for aarch64-linux-android.
+# Other Android targets (armv7, x86_64) are NOT supported by ort-sys.
 
 set -e
 
@@ -17,7 +15,7 @@ FEATURES="ffi"
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
-        aarch64-linux-android|armv7-linux-androideabi|x86_64-linux-android)
+        aarch64-linux-android)
             TARGET="$1"
             shift
             ;;
@@ -32,10 +30,11 @@ while [[ $# -gt 0 ]]; do
         --help|-h)
             echo "Usage: $0 [target] [--release] [--features features]"
             echo ""
-            echo "Targets:"
+            echo "Supported targets:"
             echo "  aarch64-linux-android  ARM64 (default)"
-            echo "  armv7-linux-androideabi ARMv7"
-            echo "  x86_64-linux-android  x86_64 (emulators)"
+            echo ""
+            echo "Note: armv7-linux-androideabi and x86_64-linux-android"
+            echo "      are NOT supported by ort-sys prebuilt binaries."
             echo ""
             echo "Options:"
             echo "  --release    Build in release mode"
@@ -44,6 +43,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo "Unknown option: $1"
+            echo "Only aarch64-linux-android is supported by ort-sys."
             exit 1
             ;;
     esac
@@ -73,19 +73,7 @@ else
     OUTPUT_DIR="target/$TARGET/debug"
 fi
 
-# Determine output filename based on target
-case $TARGET in
-    aarch64-linux-android|armv7-linux-androideabi)
-        OUTPUT_FILE="libpaddleocr_rs_onnx.so"
-        ;;
-    x86_64-linux-android)
-        OUTPUT_FILE="libpaddleocr_rs_onnx.so"
-        ;;
-    *)
-        OUTPUT_FILE="libpaddleocr_rs_onnx.so"
-        ;;
-esac
-
+OUTPUT_FILE="libpaddleocr_rs_onnx.so"
 OUTPUT_PATH="$OUTPUT_DIR/$OUTPUT_FILE"
 
 if [ -f "$OUTPUT_PATH" ]; then
