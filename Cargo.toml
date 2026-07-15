@@ -6,6 +6,15 @@ repository = "https://github.com/Craun718/PaddleOCR-rs"
 license = "MIT"
 description = "ONNX-based OCR engine using PaddleOCR models (text detection, recognition, orientation classification)"
 
+[features]
+default = []
+cuda = ["ort/cuda"]
+directml = ["ort/directml"]
+openvino = ["ort/openvino"]
+nnapi = ["ort/nnapi"]
+coreml = ["ort/coreml"]
+cann = ["ort/cann"]
+
 [dependencies]
 ort = "2.0.0-rc.12"
 image = "0.25"

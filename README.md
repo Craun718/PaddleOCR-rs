@@ -30,6 +30,30 @@ pub fn new(det_model: &[u8], rec_model: &[u8], keys_data: &[u8]) -> Result<Self,
 | `rec_model` | Recognition model ONNX file byte data |
 | `keys_data` | Dictionary file byte data (character set) |
 
+Create engine with hardware acceleration:
+
+```rust
+pub fn new_with_device(
+    det_model: &[u8],
+    rec_model: &[u8],
+    keys_data: &[u8],
+    device: AccelerationDevice,
+) -> Result<Self, Box<dyn std::error::Error>>
+```
+
+| Parameter | Description |
+|-----------|-------------|
+| `det_model` | Detection model ONNX file byte data |
+| `rec_model` | Recognition model ONNX file byte data |
+| `keys_data` | Dictionary file byte data (character set) |
+| `device` | Hardware acceleration device (see `AccelerationDevice` enum) |
+
+Get the acceleration device:
+
+```rust
+pub fn device(&self) -> AccelerationDevice
+```
+
 ```rust
 pub fn detect_text_regions(&self, image: &DynamicImage) -> Result<Vec<TextRegion>, String>
 ```
@@ -59,6 +83,23 @@ pub fn new(model_data: &[u8]) -> Result<Self, Box<dyn std::error::Error>>
 | Parameter | Description |
 |-----------|-------------|
 | `model_data` | Orientation classification model ONNX file byte data |
+
+Create classifier with hardware acceleration:
+
+```rust
+pub fn new_with_device(model_data: &[u8], device: AccelerationDevice) -> Result<Self, Box<dyn std::error::Error>>
+```
+
+| Parameter | Description |
+|-----------|-------------|
+| `model_data` | Orientation classification model ONNX file byte data |
+| `device` | Hardware acceleration device (see `AccelerationDevice` enum) |
+
+Get the acceleration device:
+
+```rust
+pub fn device(&self) -> AccelerationDevice
+```
 
 ```rust
 pub fn classify(&self, image: &DynamicImage) -> Result<OrientationResult, String>
@@ -132,13 +173,70 @@ pub enum OrderBy {
     Horizontal,  // Arrange horizontally (top to bottom, left to right)
     Vertical,    // Arrange vertically (right to left, top to bottom)
     Score,       // Arrange by confidence descending
+
+#### `AccelerationDevice`
+
+Hardware acceleration device for ONNX Runtime inference.
+
+```rust
+pub enum AccelerationDevice {
+    Cpu,        // CPU-only inference (default, always available)
+    DirectML,   // DirectML acceleration (Windows, DirectX 12 GPU)
+    Cuda,       // CUDA acceleration (NVIDIA GPU)
+    OpenVINO,   // Intel OpenVINO acceleration (Windows/Linux)
+    Nnapi,      // Android NNAPI acceleration (Android)
+    Coreml,     // Apple CoreML acceleration (macOS/iOS)
+    Cann,       // Huawei CANN / Ascend NPU acceleration (Linux)
+    DirectML,   // DirectML acceleration (Windows, DirectX 12 GPU)
+    Cuda,       // CUDA acceleration (NVIDIA GPU)
+    /// Intel OpenVINO acceleration (Windows/Linux)
+    OpenVINO,
+    /// Android NNAPI acceleration (Android)
+    Nnapi,
+    /// Apple CoreML acceleration (macOS/iOS)
+    Coreml,
+    /// Huawei CANN / Ascend NPU acceleration (Linux)
+    Cann,
+}
+```
+
+**Requirements:**
+- **Cpu**: No additional requirements (always available)
+- **DirectML**: Windows 10/11 with DirectX 12 compatible GPU
+- **CUDA**: NVIDIA GPU with CUDA toolkit installed
+- **OpenVINO**: Intel CPU/GPU with OpenVINO toolkit installed
+- **NNAPI**: Android device with NNAPI support
+- **CoreML**: macOS 10.13+ or iOS 11+ device
+- **CANN**: Huawei Ascend NPU with CANN toolkit installed
+
+**Runtime behavior:** If a requested EP is not available at runtime (not compiled into the
+ ONNX Runtime binary, missing libraries, or unsupported platform), a warning is logged and
+ inference falls back to CPU automatically.
+
+**EP availability by feature:**
+- ✅ **CPU** — always available
+- ✅ **DirectML** — included in default Windows builds (no feature needed)
+- ❌ **CUDA** — requires `cuda` feature + CUDA toolkit
+- ❌ **OpenVINO** — requires `openvino` feature + custom ORT build
+- ❌ **NNAPI** — requires `nnapi` feature + custom ORT build
+- ❌ **CoreML** — requires `coreml` feature + custom ORT build
+- ❌ **CANN** — requires `cann` feature + custom ORT build
+
+**Enable EPs via Cargo features:**
+```toml
+[dependencies]
+paddleocr_rs_onnx = { version = "0.1", features = ["cuda"] }
+
+# Multiple EPs (fallback order: first enabled EP first)
+paddleocr_rs_onnx = { version = "0.1", features = ["cuda", "directml"] }
+```
 }
 ```
 
 ## Usage
 
 ```rust
-use paddleocr_rs_onnx::{OcrEngine, DocOrientationClassifier, OrderBy};
+use paddleocr_rs_onnx::{OcrEngine, DocOrientationClassifier, OrderBy, AccelerationDevice};
 
 // Read model files
 let det_model = std::fs::read("ch_PP-OCRv4_det_infer.onnx")?;
@@ -147,6 +245,10 @@ let keys = std::fs::read("ppocr_keys_v1.txt")?;
 
 // Create OCR engine
 let engine = OcrEngine::new(&det_model, &rec_model, &keys)?;
+
+// Or create with hardware acceleration
+let engine = OcrEngine::new_with_device(&det_model, &rec_model, &keys, AccelerationDevice::DirectML)?;
+let engine = OcrEngine::new_with_device(&det_model, &rec_model, &keys, AccelerationDevice::Cuda)?;
 
 // Complete recognition
 let image = image::open("test.png")?;

@@ -38,6 +38,154 @@ pub enum OrderBy {
     Score,
 }
 
+/// Hardware acceleration device for ONNX Runtime inference.
+///
+/// Controls which execution provider is used for model inference:
+/// - `Cpu` — CPU-only inference (default, always available)
+/// - `DirectML` — DirectML acceleration (Windows, DirectX 12 GPU)
+/// - `Cuda` — CUDA acceleration (NVIDIA GPU)
+/// - `OpenVINO` — Intel OpenVINO acceleration (Windows/Linux)
+/// - `Nnapi` — Android NNAPI acceleration (Android)
+/// - `Coreml` — Apple CoreML acceleration (macOS/iOS)
+/// - `Cann` — Huawei CANN / Ascend NPU acceleration (Linux)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AccelerationDevice {
+    /// CPU-only inference (default, always available)
+    Cpu,
+    /// DirectML acceleration (Windows, DirectX 12 GPU)
+    DirectML,
+    /// CUDA acceleration (NVIDIA GPU)
+    Cuda,
+    /// Intel OpenVINO acceleration (Windows/Linux)
+    OpenVINO,
+    /// Android NNAPI acceleration (Android)
+    Nnapi,
+    /// Apple CoreML acceleration (macOS/iOS)
+    Coreml,
+    /// Huawei CANN / Ascend NPU acceleration (Linux)
+    Cann,
+}
+
+impl Default for AccelerationDevice {
+    fn default() -> Self {
+        Self::Cpu
+    }
+}
+
+impl std::fmt::Display for AccelerationDevice {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Cpu => write!(f, "CPU"),
+            Self::DirectML => write!(f, "DirectML"),
+            Self::Cuda => write!(f, "CUDA"),
+            Self::OpenVINO => write!(f, "OpenVINO"),
+            Self::Nnapi => write!(f, "NNAPI"),
+            Self::Coreml => write!(f, "CoreML"),
+            Self::Cann => write!(f, "CANN"),
+        }
+    }
+}
+
+impl AccelerationDevice {
+    /// Parse a device string (case-insensitive).
+    ///
+    /// Supported values: "cpu", "cuda"/"nvidia", "directml"/"dml",
+    /// "openvino"/"open-vino"/"ov", "nnapi", "coreml"/"apple",
+    /// "cann"/"ascend"/"huawei".
+    pub fn from_str_loose(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "cpu" => Some(Self::Cpu),
+            "cuda" | "nvidia" => Some(Self::Cuda),
+            "directml" | "dml" => Some(Self::DirectML),
+            "openvino" | "open-vino" | "ov" => Some(Self::OpenVINO),
+            "nnapi" => Some(Self::Nnapi),
+            "coreml" | "apple" => Some(Self::Coreml),
+            "cann" | "ascend" | "huawei" => Some(Self::Cann),
+            _ => None,
+        }
+    }
+}
+
+/// Configure execution providers on a session builder.
+///
+/// If the requested EP is not available (not compiled into ORT, missing runtime
+/// libraries, or unsupported on this platform), a warning is logged and the
+/// session falls back to CPU.
+fn configure_session_builder(
+    builder: ort::session::builder::SessionBuilder,
+    device: AccelerationDevice,
+) -> Result<ort::session::builder::SessionBuilder, PaddleOcrError> {
+    match device {
+        AccelerationDevice::Cpu => Ok(builder),
+        AccelerationDevice::DirectML => {
+            info!("[ep] configuring DirectML execution provider");
+            let ep = ort::ep::DirectML::default().build();
+            match builder.clone().with_execution_providers([ep]) {
+                Ok(b) => Ok(b),
+                Err(e) => {
+                    warn!("[ep] DirectML unavailable, falling back to CPU: {}", e);
+                    Ok(builder)
+                }
+            }
+        }
+        AccelerationDevice::Cuda => {
+            info!("[ep] configuring CUDA execution provider");
+            let ep = ort::ep::CUDA::default().build();
+            match builder.clone().with_execution_providers([ep]) {
+                Ok(b) => Ok(b),
+                Err(e) => {
+                    warn!("[ep] CUDA unavailable, falling back to CPU: {}", e);
+                    Ok(builder)
+                }
+            }
+        }
+        AccelerationDevice::OpenVINO => {
+            info!("[ep] configuring OpenVINO execution provider");
+            let ep = ort::ep::OpenVINO::default().build();
+            match builder.clone().with_execution_providers([ep]) {
+                Ok(b) => Ok(b),
+                Err(e) => {
+                    warn!("[ep] OpenVINO unavailable, falling back to CPU: {}", e);
+                    Ok(builder)
+                }
+            }
+        }
+        AccelerationDevice::Nnapi => {
+            info!("[ep] configuring NNAPI execution provider");
+            let ep = ort::ep::NNAPI::default().build();
+            match builder.clone().with_execution_providers([ep]) {
+                Ok(b) => Ok(b),
+                Err(e) => {
+                    warn!("[ep] NNAPI unavailable, falling back to CPU: {}", e);
+                    Ok(builder)
+                }
+            }
+        }
+        AccelerationDevice::Coreml => {
+            info!("[ep] configuring CoreML execution provider");
+            let ep = ort::ep::CoreML::default().build();
+            match builder.clone().with_execution_providers([ep]) {
+                Ok(b) => Ok(b),
+                Err(e) => {
+                    warn!("[ep] CoreML unavailable, falling back to CPU: {}", e);
+                    Ok(builder)
+                }
+            }
+        }
+        AccelerationDevice::Cann => {
+            info!("[ep] configuring CANN execution provider");
+            let ep = ort::ep::CANN::default().build();
+            match builder.clone().with_execution_providers([ep]) {
+                Ok(b) => Ok(b),
+                Err(e) => {
+                    warn!("[ep] CANN unavailable, falling back to CPU: {}", e);
+                    Ok(builder)
+                }
+            }
+        }
+    }
+}
+
 pub struct OcrEngine {
     det_session: Mutex<ort::session::Session>,
     rec_sessions: Mutex<VecDeque<ort::session::Session>>,
@@ -49,13 +197,25 @@ pub struct OcrEngine {
     rec_height: u32,
     rec_width: Option<u32>,
     keys: Vec<String>,
+    device: AccelerationDevice,
 }
 
 impl OcrEngine {
     pub fn new(det_model: &[u8], rec_model: &[u8], keys_data: &[u8]) -> Result<Self, PaddleOcrError> {
-        let det_session = ort::session::Session::builder()?
+        Self::new_with_device(det_model, rec_model, keys_data, AccelerationDevice::default())
+    }
+
+    pub fn new_with_device(
+        det_model: &[u8],
+        rec_model: &[u8],
+        keys_data: &[u8],
+        device: AccelerationDevice,
+    ) -> Result<Self, PaddleOcrError> {
+        info!("[ocr] creating engine with device: {}", device);
+
+        let det_session = configure_session_builder(ort::session::Session::builder()?, device)?
             .commit_from_memory(det_model)?;
-        let rec_session = ort::session::Session::builder()?
+        let rec_session = configure_session_builder(ort::session::Session::builder()?, device)?
             .commit_from_memory(rec_model)?;
 
         let det_input = det_session.inputs()[0].name().to_string();
@@ -109,7 +269,8 @@ impl OcrEngine {
         sessions.push_back(rec_session);
         for _ in 1..pool_size {
             sessions.push_back(
-                ort::session::Session::builder()?.commit_from_memory(rec_model)?,
+                configure_session_builder(ort::session::Session::builder()?, device)?
+                    .commit_from_memory(rec_model)?,
             );
         }
 
@@ -124,7 +285,13 @@ impl OcrEngine {
             rec_height,
             rec_width,
             keys,
+            device,
         })
+    }
+
+    /// Returns the acceleration device used by this engine.
+    pub fn device(&self) -> AccelerationDevice {
+        self.device
     }
 
     pub fn detect_text_regions(&self, image: &DynamicImage) -> Result<Vec<TextRegion>, PaddleOcrError> {
@@ -159,42 +326,70 @@ impl OcrEngine {
         Ok(decode::ctc_decode(&probs, &self.keys))
     }
 
-    pub fn recognize_all(&self, image: &DynamicImage, order_by: OrderBy) -> Result<Vec<OcrBlock>, PaddleOcrError> {
+    /// Complete OCR pipeline: detection + recognition.
+    /// `order` controls the output ordering of text blocks.
+    pub fn recognize_all(&self, image: &DynamicImage, order: OrderBy) -> Result<Vec<OcrBlock>, PaddleOcrError> {
         let regions = self.detect_text_regions(image)?;
+
         if regions.is_empty() {
-            if let Some(block) = self.recognize_full_image(image)? {
-                return Ok(vec![block]);
-            }
-            return Ok(Vec::new());
+            // Try full-image recognition as fallback
+            return self.recognize_full_image(image)
+                .map(|b| b.into_iter().collect())
+                .map_err(|e| PaddleOcrError::General(e.to_string()));
         }
 
         let mut blocks: Vec<OcrBlock> = regions
             .par_iter()
             .filter_map(|region| {
-                let decoded = match self.recognize_text(image, region) {
-                    Ok(d) => d,
-                    Err(e) => {
-                        warn!("[ocr] skipping region {:?}: {}", region.bbox, e);
-                        return None;
+                match self.recognize_text(image, region) {
+                    Ok(decoded) => {
+                        if decoded.text.is_empty() {
+                            None
+                        } else {
+                            let (x, y, width, height) = bbox_to_rect(&region.bbox);
+                            Some(OcrBlock {
+                                text: decoded.text,
+                                confidence: decoded.score,
+                                x,
+                                y,
+                                width,
+                                height,
+                            })
+                        }
                     }
-                };
-                let (x, y, w, h) = bbox_to_rect(&region.bbox);
-                Some(OcrBlock {
-                    text: decoded.text,
-                    confidence: decoded.score,
-                    x,
-                    y,
-                    width: w,
-                    height: h,
-                })
+                    Err(PaddleOcrError::DegenerateRegion { .. }) => {
+                        // Skip degenerate regions silently
+                        None
+                    }
+                    Err(_) => None,
+                }
             })
             .collect();
 
-        match order_by {
-            OrderBy::Horizontal => blocks.sort_by(|a, b| a.x.total_cmp(&b.x).then(a.y.total_cmp(&b.y))),
-            OrderBy::Vertical => blocks.sort_by(|a, b| a.y.total_cmp(&b.y).then(a.x.total_cmp(&b.x))),
-            OrderBy::Score => blocks.sort_by(|a, b| b.confidence.total_cmp(&a.confidence)),
+        match order {
+            OrderBy::Horizontal => {
+                blocks.sort_by(|a, b| {
+                    a.y.partial_cmp(&b.y)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                        .then_with(|| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal))
+                });
+            }
+            OrderBy::Vertical => {
+                blocks.sort_by(|a, b| {
+                    a.x.partial_cmp(&b.x)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                        .then_with(|| a.y.partial_cmp(&b.y).unwrap_or(std::cmp::Ordering::Equal))
+                });
+            }
+            OrderBy::Score => {
+                blocks.sort_by(|a, b| {
+                    b.confidence
+                        .partial_cmp(&a.confidence)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
+            }
         }
+
         Ok(blocks)
     }
 
@@ -256,6 +451,7 @@ pub struct DocOrientationClassifier {
     session: Mutex<ort::session::Session>,
     input_name: String,
     output_name: String,
+    device: AccelerationDevice,
 }
 
 impl DocOrientationClassifier {
@@ -267,7 +463,14 @@ impl DocOrientationClassifier {
     /// # Returns
     /// A new classifier instance ready to classify images.
     pub fn new(model_data: &[u8]) -> Result<Self, PaddleOcrError> {
-        let session = ort::session::Session::builder()?
+        Self::new_with_device(model_data, AccelerationDevice::default())
+    }
+
+    /// Create a new orientation classifier with a specific acceleration device.
+    pub fn new_with_device(model_data: &[u8], device: AccelerationDevice) -> Result<Self, PaddleOcrError> {
+        info!("[doc_ori] creating classifier with device: {}", device);
+
+        let session = configure_session_builder(ort::session::Session::builder()?, device)?
             .commit_from_memory(model_data)?;
 
         let input_name = session.inputs()[0].name().to_string();
@@ -293,7 +496,13 @@ impl DocOrientationClassifier {
             session: Mutex::new(session),
             input_name,
             output_name,
+            device,
         })
+    }
+
+    /// Returns the acceleration device used by this classifier.
+    pub fn device(&self) -> AccelerationDevice {
+        self.device
     }
 
     /// Classify the orientation of a document image.
@@ -340,16 +549,4 @@ impl DocOrientationClassifier {
         Ok((corrected, result))
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
 

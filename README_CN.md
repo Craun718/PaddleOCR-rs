@@ -127,18 +127,71 @@ pub enum DocOrientation {
 
 #### `OrderBy`
 
-```rust
+````rust
 pub enum OrderBy {
     Horizontal,  // 按水平顺序排列（从上到下，从左到右）
     Vertical,    // 按垂直顺序排列（从右到左，从上到下）
     Score,    // 按置信度降序排列
+
+#### `AccelerationDevice`
+
+ONNX Runtime 推理的硬件加速设备。
+
+```rust
+pub enum AccelerationDevice {
+    Cpu,        // 仅 CPU 推理（默认，始终可用）
+    DirectML,   // DirectML 加速（Windows，DirectX 12 GPU）
+    Cuda,       // CUDA 加速（NVIDIA GPU）
+    OpenVINO,   // Intel OpenVINO 加速（Windows/Linux）
+    Nnapi,      // Android NNAPI 加速（Android）
+    Coreml,     // Apple CoreML 加速（macOS/iOS）
+    Cann,       // 华为 CANN / 昇腾 NPU 加速（Linux）
+    DirectML,   // DirectML 加速（Windows，DirectX 12 GPU）
+    Cuda,       // CUDA 加速（NVIDIA GPU）
+    OpenVINO,   // Intel OpenVINO 加速（Windows/Linux）
+    Nnapi,      // Android NNAPI 加速（Android）
+    Coreml,     // Apple CoreML 加速（macOS/iOS）
+    Cann,       // 华为 CANN / 昇腾 NPU 加速（Linux）
+}
+````
+
+**要求：**
+
+- **Cpu**: 无额外要求（始终可用）
+- **DirectML**: Windows 10/11，需要支持 DirectX 12 的 GPU
+- **CUDA**: 需要安装 CUDA 工具包的 NVIDIA GPU
+- **OpenVINO**: 安装了 OpenVINO 工具包的 Intel CPU/GPU
+- **NNAPI**: 支持 NNAPI 的 Android 设备
+- **CoreML**: macOS 10.13+ 或 iOS 11+ 设备
+- **CANN**: 安装了 CANN 工具包的华为昇腾 NPU
+
+**运行时行为：** 如果请求的 EP 在运行时不可用（未编译到 ORT 二进制文件中、缺少运行时库或不支持当前平台），系统会记录警告并自动回退到 CPU 推理。
+
+**按 feature 控制的 EP 可用性：**
+- ✅ **CPU** — 始终可用
+- ✅ **DirectML** — 包含在默认 Windows 构建中（无需 feature）
+- ❌ **CUDA** — 需要 `cuda` feature + CUDA 工具包
+- ❌ **OpenVINO** — 需要 `openvino` feature + 自定义 ORT 构建
+- ❌ **NNAPI** — 需要 `nnapi` feature + 自定义 ORT 构建
+- ❌ **CoreML** — 需要 `coreml` feature + 自定义 ORT 构建
+- ❌ **CANN** — 需要 `cann` feature + 自定义 ORT 构建
+
+**通过 Cargo features 启用 EP：**
+```toml
+[dependencies]
+paddleocr_rs_onnx = { version = "0.1", features = ["cuda"] }
+
+# 多个 EP（回退顺序：先启用的 EP 优先）
+paddleocr_rs_onnx = { version = "0.1", features = ["cuda", "directml"] }
+```
 }
 ```
 
+## Usage
 ## 使用方法
 
 ```rust
-use paddleocr_rs_onnx::{OcrEngine, DocOrientationClassifier, OrderBy};
+use paddleocr_rs_onnx::{OcrEngine, DocOrientationClassifier, OrderBy, AccelerationDevice};
 
 // 读取模型文件
 let det_model = std::fs::read("ch_PP-OCRv4_det_infer.onnx")?;
@@ -147,6 +200,10 @@ let keys = std::fs::read("ppocr_keys_v1.txt")?;
 
 // 创建 OCR 引擎
 let engine = OcrEngine::new(&det_model, &rec_model, &keys)?;
+
+// 或使用硬件加速创建
+let engine = OcrEngine::new_with_device(&det_model, &rec_model, &keys, AccelerationDevice::DirectML)?;
+let engine = OcrEngine::new_with_device(&det_model, &rec_model, &keys, AccelerationDevice::Cuda)?;
 
 // 完整识别
 let image = image::open("test.png")?;
@@ -160,7 +217,7 @@ let cls_model = std::fs::read("PP-LCNet_x1_0_doc_ori.onnx")?;
 let classifier = DocOrientationClassifier::new(&cls_model)?;
 let (corrected, result) = classifier.correct_orientation(&image)?;
 println!("方向: {}°, 置信度: {:.2}%", result.orientation.angle(), result.confidence * 100.0);
-```
+````
 
 ## 许可证
 
@@ -180,31 +237,31 @@ MIT
 
 ### 加速硬件支持对比
 
-| 平台/后端           | 本项目 (PaddleOCR-rs) | [mg-chao/paddle-ocr-rs](https://github.com/mg-chao/paddle-ocr-rs) | [zibo-chen/rust-paddle-ocr](https://github.com/zibo-chen/rust-paddle-ocr) |
-| ------------------- | --------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| **Windows**         |                       |                                                                   |                                                                           |
+| 平台/后端           | 本项目 (PaddleOCR-rs)   | [mg-chao/paddle-ocr-rs](https://github.com/mg-chao/paddle-ocr-rs) | [zibo-chen/rust-paddle-ocr](https://github.com/zibo-chen/rust-paddle-ocr) |
+| ------------------- | ----------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| **Windows**         |                         |                                                                   |                                                                           |
 | CPU                 | ✅ ONNX Runtime（默认） | ✅ ONNX Runtime（默认）                                           | ✅ MNN（默认）                                                            |
 | CUDA (NVIDIA)       | ❌ 未启用               | ✅ CUDA                                                           | ✅ CUDA                                                                   |
 | DirectML (通用 GPU) | ❌ 未启用               | ✅ DirectML                                                       | ❌                                                                        |
-| **Linux**           |                       |                                                                   |                                                                           |
+| **Linux**           |                         |                                                                   |                                                                           |
 | CPU                 | ✅ ONNX Runtime（默认） | ✅ ONNX Runtime（默认）                                           | ✅ MNN（默认）                                                            |
 | CUDA (NVIDIA)       | ❌ 未启用               | ✅ CUDA                                                           | ✅ CUDA                                                                   |
 | CANN (昇腾)         | ❌ 未启用               | ✅ CANN                                                           | ❌                                                                        |
 | OpenCL              | ❌                      | ❌                                                                | ✅ OpenCL                                                                 |
 | Vulkan              | ❌                      | ❌                                                                | ✅ Vulkan                                                                 |
-| **macOS**           |                       |                                                                   |                                                                           |
+| **macOS**           |                         |                                                                   |                                                                           |
 | CPU                 | ✅ ONNX Runtime（默认） | ✅ ONNX Runtime（默认）                                           | ✅ MNN（默认）                                                            |
 | CoreML (Apple GPU)  | ❌ 未启用               | ❌                                                                | ✅ CoreML                                                                 |
 | Metal (Apple GPU)   | ❌                      | ❌                                                                | ✅ Metal                                                                  |
-| **Android**         |                       |                                                                   |                                                                           |
+| **Android**         |                         |                                                                   |                                                                           |
 | CPU                 | ❌ 不支持               | ❌ 不支持                                                         | ✅ MNN（默认）                                                            |
 | OpenCL              | ❌                      | ❌                                                                | ✅ OpenCL                                                                 |
 | Vulkan              | ❌                      | ❌                                                                | ✅ Vulkan                                                                 |
-| **iOS**             |                       |                                                                   |                                                                           |
+| **iOS**             |                         |                                                                   |                                                                           |
 | CPU                 | ❌ 不支持               | ❌ 不支持                                                         | ✅ MNN（默认）                                                            |
 | CoreML (Apple GPU)  | ❌                      | ❌                                                                | ✅ CoreML                                                                 |
 | Metal (Apple GPU)   | ❌                      | ❌                                                                | ✅ Metal                                                                  |
-| **其他**            |                       |                                                                   |                                                                           |
+| **其他**            |                         |                                                                   |                                                                           |
 | OpenGL              | ❌                      | ❌                                                                | ✅ OpenGL                                                                 |
 | 硬件后端总数        | 0 个加速后端            | 3 个加速后端（CUDA + DirectML + CANN）                            | 6 个加速后端（CUDA + Metal + CoreML + OpenCL + Vulkan + OpenGL）          |
 
