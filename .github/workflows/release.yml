@@ -153,7 +153,7 @@ jobs:
         run: |
           TAG="${{ steps.tag.outputs.tag }}"
           tar -czf "dist/paddleocr-rs-${TAG}-src.tar.gz" \
-            --exclude='.git' --exclude='target' \
+            --exclude='.git' --exclude='target' --exclude='dist' \
             -C "$GITHUB_WORKSPACE" .
 
       - name: Upload release assets
