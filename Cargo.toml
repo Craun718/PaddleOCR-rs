@@ -21,7 +21,7 @@ cann = ["ort/cann"]
 ffi = []
 
 [lib]
-crate-type = ["lib", "cdylib"]
+crate-type = ["lib", "cdylib", "staticlib"]
 
 [dependencies]
 ort = "2.0.0-rc.12"
