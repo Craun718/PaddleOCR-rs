@@ -179,8 +179,8 @@ jobs:
                   mkdir -p release
                   tar -czf "release/paddleocr-rs-${TAG}-x86_64-linux.tar.gz" \
                     -C target/x86_64-unknown-linux-gnu/release \
-                    paddleocr_rs_onnx
-
+                    libpaddleocr_rs_onnx.so \
+                    libpaddleocr_rs_onnx.a
             # ---------- Windows x86_64 ----------
             - uses: dtolnay/rust-toolchain@stable
               with:
@@ -194,7 +194,7 @@ jobs:
               run: |
                   TAG="${{ steps.tag.outputs.tag }}"
                   cd target/x86_64-pc-windows-msvc/release
-                  7z a "../../release/paddleocr-rs-${TAG}-x86_64-windows.zip" paddleocr_rs_onnx.exe
+                  7z a "../../release/paddleocr-rs-${TAG}-x86_64-windows.zip" paddleocr_rs_onnx.dll
                   cd "$GITHUB_WORKSPACE"
 
             # ---------- macOS aarch64 ----------
@@ -211,7 +211,7 @@ jobs:
                   TAG="${{ steps.tag.outputs.tag }}"
                   tar -czf "release/paddleocr-rs-${TAG}-aarch64-macos.tar.gz" \
                     -C target/aarch64-apple-darwin/release \
-                    paddleocr_rs_onnx
+                    libpaddleocr_rs_onnx.dylib
 
             # ---------- Android aarch64 ----------
             - uses: dtolnay/rust-toolchain@stable
