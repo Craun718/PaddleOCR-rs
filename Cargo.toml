@@ -4,7 +4,11 @@ version = "0.2.0"
 edition = "2021"
 repository = "https://github.com/Craun718/PaddleOCR-rs"
 license = "MIT"
+authors = ["Craun718 <3653544699@qq.com>"]
 description = "ONNX-based OCR engine using PaddleOCR models (text detection, recognition, orientation classification)"
+readme = "README.md"
+keywords = ["ocr", "paddleocr", "onnx", "text-detection", "text-recognition"]
+categories = ["text-processing", "multimedia::image"]
 
 [features]
 default = []
