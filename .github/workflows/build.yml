@@ -179,8 +179,7 @@ jobs:
                   mkdir -p release
                   tar -czf "release/paddleocr-rs-${TAG}-x86_64-linux.tar.gz" \
                     -C target/x86_64-unknown-linux-gnu/release \
-                    libpaddleocr_rs_onnx.so \
-                    libpaddleocr_rs_onnx.a
+                    libpaddleocr_rs_onnx.so
             # ---------- Windows x86_64 ----------
             - uses: dtolnay/rust-toolchain@stable
               with:
