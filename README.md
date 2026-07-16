@@ -55,7 +55,7 @@ PaddleOCR-rs supports Android and iOS platforms via C FFI interface.
 
 - **CPU**: ✅ Supported (via ONNX Runtime)
 - **NNAPI**: ✅ Supported (via nnapi feature)
-- **Targets**: aarch64-linux-android, armv7-linux-androideabi, x86_64-linux-android
+- **Targets**: aarch64-linux-android, armv7-linux-androideabi (requires custom build), x86_64-linux-android (requires custom build)
 
 ### iOS
 
@@ -72,17 +72,6 @@ PaddleOCR-rs supports Android and iOS platforms via C FFI interface.
 # iOS
 ./build-ios.sh aarch64-apple-ios --release
 ```
-
-### FFI Interface
-
-Enable the `ffi` feature to expose C-compatible API:
-
-```toml
-[dependencies]
-paddleocr_rs_onnx = { version = "0.2", features = ["ffi"] }
-```
-
-See `src/ffi.rs` for the complete FFI API documentation.
 
 ### Example Projects
 
@@ -118,15 +107,14 @@ This project is one of several Rust implementations of PaddleOCR. Below is a com
 
 ### Comprehensive Comparison
 
-| Feature                  | PaddleOCR-rs                                                      | [paddle-ocr-rs](https://github.com/mg-chao/paddle-ocr-rs) | [rust-paddle-ocr](https://github.com/zibo-chen/rust-paddle-ocr) |
-| ------------------------ | ----------------------------------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------- |
-| **Model Format Support** | ✅ ONNX only                                                      | ✅ ONNX format                                            | ✅ MNN format                                                   |
-| **Document Orientation** | PP-LCNet classifier                                               | PP-OCR v2.0 classifier                                    | PP-LCNet classifier                                             |
-| **Concurrency**          | ✅ rayon parallel + session pooling                               | ✅ rayon parallel + batch inference                       | ⚠️ rayon in pre/post-processing, inference is single-threaded   |
-| **External Interfaces**  | ✅ Rust API + C FFI API (via `ffi` feature)                       | ✅ YAML config + CLI (rapidocr)                           | ✅ C API (cdylib) + CLI (newbee-ocr-cli)                        |
-| **Text Processing**      | ✅ Sorting modes (Horizontal/Vertical/Score)                      | ✅ Word-level boxes + BiDi text                           | ✅ FP16 inference + async support                               |
-| **Memory/Type Safety**   | ✅ Memory-safe Rust + strong typing + automatic memory management | ✅ Memory-safe Rust + strong typing                       | ✅ Memory-safe Rust (mnn-rs) + ⚠️ C API partial                 |
-| **Concurrency Safety**   | ✅ Thread-safe by design                                          | ✅ Thread-safe (Arc + Mutex)                              | ⚠️ Requires careful handling                                    |
+| Feature                  | PaddleOCR-rs                                | [paddle-ocr-rs](https://github.com/mg-chao/paddle-ocr-rs) | [rust-paddle-ocr](https://github.com/zibo-chen/rust-paddle-ocr) |
+| ------------------------ | ------------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------- |
+| **Model Format Support** | ✅ ONNX only                                | ✅ ONNX format                                            | ✅ MNN format                                                   |
+| **Document Orientation** | PP-LCNet classifier                         | PP-OCR v2.0 classifier                                    | PP-LCNet classifier                                             |
+| **Concurrency**          | ✅ rayon parallel + session pooling         | ✅ rayon parallel + batch inference                       | ⚠️ rayon in pre/post-processing, inference is single-threaded   |
+| **External Interfaces**  | ✅ Rust API + C FFI API (via `ffi` feature) | ✅ YAML config + CLI (rapidocr)                           | ✅ C API (cdylib) + CLI (newbee-ocr-cli)                        |
+| **Memory/Type Safety**   | ✅ Memory-safe Rust + strong typing         | ✅ Memory-safe Rust + strong typing                       | ✅ Memory-safe Rust (mnn-rs) + ⚠️ C API partial                 |
+| **Concurrency Safety**   | ✅ Thread-safe by design                    | ✅ Thread-safe (Arc + Mutex)                              | ⚠️ Requires careful handling                                    |
 
 ## Thanks
 

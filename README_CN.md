@@ -113,8 +113,7 @@ PaddleOCR-rs 通过 C FFI 接口支持 Android 和 iOS 平台。
 | **文档方向分类**  | PP-LCNet 分类器                               | PP-OCR v2.0 分类器                                        | PP-LCNet 分类器                                                 |
 | **并发能力**      | ✅ rayon 并行 + 会话池                        | ✅ rayon 并行 + 批量推理                                  | ⚠️ 预处理/后处理使用 rayon，推理部分单线程                      |
 | **外部接口**      | ✅ Rust API + C FFI API（通过 `ffi` feature） | ✅ YAML 配置 + CLI (rapidocr)                             | ✅ C API (cdylib) + CLI (newbee-ocr-cli)                        |
-| **文本处理**      | ✅ 排序模式（Horizontal/Vertical/Score）      | ✅ 词级边框 + BiDi 文本                                   | ✅ FP16 推理 + 异步支持                                         |
-| **内存/类型安全** | ✅ 内存安全 Rust + 强类型 + 自动内存管理      | ✅ 内存安全 Rust + 强类型                                 | ✅ 内存安全 Rust (mnn-rs) + ⚠️ C API 部分                       |
+| **内存/类型安全** | ✅ 内存安全 Rust + 强类型                     | ✅ 内存安全 Rust + 强类型                                 | ✅ 内存安全 Rust (mnn-rs) + ⚠️ C API 部分                       |
 | **并发安全性**    | ✅ 设计层面线程安全                           | ✅ 线程安全（Arc + Mutex）                                | ⚠️ 需要小心处理                                                 |
 
 ## 致谢
