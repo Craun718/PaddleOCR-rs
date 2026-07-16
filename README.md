@@ -96,42 +96,37 @@ This project is one of several Rust implementations of PaddleOCR. Below is a com
 
 ### Acceleration Hardware Support Comparison
 
-| Platform/Backend | PaddleOCR-rs                         | [mg-chao/paddle-ocr-rs](https://github.com/mg-chao/paddle-ocr-rs) | [zibo-chen/rust-paddle-ocr](https://github.com/zibo-chen/rust-paddle-ocr) |
-| ---------------- | ------------------------------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| **Windows**      |                                      |                                                                   |                                                                           |
-| CUDA             | ✅ CUDA (via `cuda` feature)         | ✅ CUDA                                                           | ✅ CUDA                                                                   |
-| DirectML         | ✅ DirectML                          | ✅ DirectML                                                       | ❌                                                                        |
-| OpenVINO         | ✅ OpenVINO (via `openvino` feature) | ❌                                                                | ❌                                                                        |
-| **Linux**        |                                      |                                                                   |                                                                           |
-| CUDA             | ✅ CUDA (via `cuda` feature)         | ✅ CUDA                                                           | ✅ CUDA                                                                   |
-| CANN             | ✅ CANN (via `cann` feature)         | ✅ CANN                                                           | ❌                                                                        |
-| OpenVINO         | ✅ OpenVINO (via `openvino` feature) | ❌                                                                | ❌                                                                        |
-| **macOS**        |                                      |                                                                   |                                                                           |
-| Metal            | ✅ Metal (via `metal` feature)       | ❌                                                                | ✅ Metal                                                                  |
-| CoreML           | ✅ CoreML (via `coreml` feature)     | ❌                                                                | ✅ CoreML                                                                 |
-| **Android**      |                                      |                                                                   |                                                                           |
-| NNAPI            | ✅ NNAPI (via `nnapi` feature)       | ❌                                                                | ❌                                                                        |
-| CPU              | ✅ CPU                               | ✅ CPU                                                            | ✅ CPU                                                                    |
-| **iOS**          |                                      |                                                                   |                                                                           |
-| CoreML           | ✅ CoreML (via `coreml` feature)     | ❌                                                                | ✅ CoreML                                                                 |
-| CPU              | ✅ CPU                               | ✅ CPU                                                            | ✅ CPU                                                                    |
+| Platform/Backend | PaddleOCR-rs                | [paddle-ocr-rs](https://github.com/mg-chao/paddle-ocr-rs) | [rust-paddle-ocr](https://github.com/zibo-chen/rust-paddle-ocr) |
+| ---------------- | --------------------------- | --------------------------------------------------------- | --------------------------------------------------------------- |
+| **Windows**      |                             |                                                           |                                                                 |
+| CUDA             | ✅ (via `cuda` feature)     | ✅                                                        | ✅                                                              |
+| DirectML         | ✅                          | ✅                                                        | ❌                                                              |
+| OpenVINO         | ✅ (via `openvino` feature) | ❌                                                        | ❌                                                              |
+| **Linux**        |                             |                                                           |                                                                 |
+| CUDA             | ✅ (via `cuda` feature)     | ✅                                                        | ✅                                                              |
+| CANN             | ✅ (via `cann` feature)     | ✅                                                        | ❌                                                              |
+| OpenVINO         | ✅ (via `openvino` feature) | ❌                                                        | ❌                                                              |
+| **macOS**        |                             |                                                           |                                                                 |
+| Metal            | ✅ (via `metal` feature)    | ❌                                                        | ✅                                                              |
+| CoreML           | ✅ (via `coreml` feature)   | ❌                                                        | ✅                                                              |
+| **Android**      |                             |                                                           |                                                                 |
+| NNAPI            | ✅ (via `nnapi` feature)    | ❌                                                        | ❌                                                              |
+| CPU              | ✅                          | ✅                                                        | ✅                                                              |
+| **iOS**          |                             |                                                           |                                                                 |
+| CoreML           | ✅ (via `coreml` feature)   | ❌                                                        | ✅                                                              |
+| CPU              | ✅                          | ✅                                                        | ✅                                                              |
 
 ### Comprehensive Comparison
 
-| Feature                    | PaddleOCR-rs                                                      | [mg-chao/paddle-ocr-rs](https://github.com/mg-chao/paddle-ocr-rs)             | [zibo-chen/rust-paddle-ocr](https://github.com/zibo-chen/rust-paddle-ocr) |
-| -------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| **Model Format**           | ✅ ONNX only                                                      | ✅ ONNX format                                                                | ✅ MNN format                                                             |
-| **Backend/Runtime**        | ONNX Runtime (feature flags)                                      | ONNX Runtime (via ort crate)                                                  | MNN Framework (via mnn-rs)                                                |
-| **Document Orientation**   | ✅ PP-LCNet classifier (0/90/180/270°)                            | ✅ PP-OCR v2.0 classifier (0/180°)                                            | ✅ PP-LCNet classifier (0/90/180/270° + 0/180°)                           |
-| **Concurrency**            | ✅ rayon parallel + session pooling                               | ✅ rayon parallel + batch inference (6 images for recognition/classification) | ⚠️ rayon in pre/post-processing, inference is single-threaded             |
-| **Image Preprocessing**    | ✅ Rust native image processing                                   | ✅ Pure Rust implementation (or optional OpenCV)                              | ✅ Rust native (image + imageproc + ndarray)                              |
-| **Model Format Support**   | ✅ ONNX only                                                      | ✅ ONNX format                                                                | ✅ MNN format                                                             |
-| **Platform Compatibility** | ✅ Excellent (ONNX Runtime cross-platform, single binary)         | ✅ Excellent (ONNX Runtime cross-platform)                                    | ✅ Good (MNN supports multiple platforms)                                 |
-| **External Interfaces**    | ✅ Rust API + C FFI API (via `ffi` feature)                       | ✅ YAML config + CLI (rapidocr)                                               | ✅ C API (cdylib) + CLI (newbee-ocr-cli)                                  |
-| **Text Processing**        | ✅ Sorting modes (Horizontal/Vertical/Score)                      | ✅ Word-level boxes + BiDi text                                               | ✅ FP16 inference + async support                                         |
-| **Memory/Type Safety**     | ✅ Memory-safe Rust + strong typing + automatic memory management | ✅ Memory-safe Rust + strong typing                                           | ✅ Memory-safe Rust (mnn-rs) + ⚠️ C API partial                           |
-| **Error Handling & API**   | ✅ Rust Result types + modern idioms                              | ✅ Rust Result types (thiserror)                                              | ✅ Rust Result types (thiserror)                                          |
-| **Concurrency Safety**     | ✅ Thread-safe by design                                          | ✅ Thread-safe (Arc + Mutex)                                                  | ⚠️ Requires careful handling                                              |
+| Feature                  | PaddleOCR-rs                                                      | [paddle-ocr-rs](https://github.com/mg-chao/paddle-ocr-rs) | [rust-paddle-ocr](https://github.com/zibo-chen/rust-paddle-ocr) |
+| ------------------------ | ----------------------------------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------- |
+| **Model Format Support** | ✅ ONNX only                                                      | ✅ ONNX format                                            | ✅ MNN format                                                   |
+| **Document Orientation** | PP-LCNet classifier                                               | PP-OCR v2.0 classifier                                    | PP-LCNet classifier                                             |
+| **Concurrency**          | ✅ rayon parallel + session pooling                               | ✅ rayon parallel + batch inference                       | ⚠️ rayon in pre/post-processing, inference is single-threaded   |
+| **External Interfaces**  | ✅ Rust API + C FFI API (via `ffi` feature)                       | ✅ YAML config + CLI (rapidocr)                           | ✅ C API (cdylib) + CLI (newbee-ocr-cli)                        |
+| **Text Processing**      | ✅ Sorting modes (Horizontal/Vertical/Score)                      | ✅ Word-level boxes + BiDi text                           | ✅ FP16 inference + async support                               |
+| **Memory/Type Safety**   | ✅ Memory-safe Rust + strong typing + automatic memory management | ✅ Memory-safe Rust + strong typing                       | ✅ Memory-safe Rust (mnn-rs) + ⚠️ C API partial                 |
+| **Concurrency Safety**   | ✅ Thread-safe by design                                          | ✅ Thread-safe (Arc + Mutex)                              | ⚠️ Requires careful handling                                    |
 
 ## Thanks
 

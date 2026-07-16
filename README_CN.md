@@ -85,39 +85,37 @@ PaddleOCR-rs 通过 C FFI 接口支持 Android 和 iOS 平台。
 
 ### 硬件加速支持对比
 
-| 平台/后端         | 本项目 (PaddleOCR-rs) | [paddle-ocr-rs](https://github.com/mg-chao/paddle-ocr-rs) | [rust-paddle-ocr](https://github.com/zibo-chen/rust-paddle-ocr) |
-| ----------------- | --------------------- | --------------------------------------------------------- | --------------------------------------------------------------- |
-| **Windows**       |                       |                                                           |                                                                 |
-| CUDA              | ✅                    | ✅                                                        | ✅                                                              |
-| DirectML          | ✅                    | ✅                                                        | ❌                                                              |
-| OpenVINO          | ✅                    | ❌                                                        | ❌                                                              |
-| **Linux**         |                       |                                                           |                                                                 |
-| CUDA              | ✅                    | ✅                                                        | ✅                                                              |
-| CANN              | ✅                    | ✅                                                        | ❌                                                              |
-| OpenVINO          | ✅                    | ❌                                                        | ❌                                                              |
-| **macOS**         |                       |                                                           |                                                                 |
-| CoreML            | ✅                    | ❌                                                        | ✅ CoreML                                                       |
-| Metal (Apple GPU) | ❌                    | ❌                                                        | ✅ Metal                                                        |
-| **其他**          |                       |                                                           |                                                                 |
-| OpenGL            | ❌                    | ❌                                                        | ✅ OpenGL                                                       |
+| 平台/后端   | 本项目 (PaddleOCR-rs)       | [paddle-ocr-rs](https://github.com/mg-chao/paddle-ocr-rs) | [rust-paddle-ocr](https://github.com/zibo-chen/rust-paddle-ocr) |
+| ----------- | --------------------------- | --------------------------------------------------------- | --------------------------------------------------------------- |
+| **Windows** |                             |                                                           |                                                                 |
+| CUDA        | ✅ (via `cuda` feature)     | ✅                                                        | ✅                                                              |
+| DirectML    | ✅                          | ✅                                                        | ❌                                                              |
+| OpenVINO    | ✅ (via `openvino` feature) | ❌                                                        | ❌                                                              |
+| **Linux**   |                             |                                                           |                                                                 |
+| CUDA        | ✅ (via `cuda` feature)     | ✅                                                        | ✅                                                              |
+| CANN        | ✅ (via `cann` feature)     | ✅                                                        | ❌                                                              |
+| OpenVINO    | ✅ (via `openvino` feature) | ❌                                                        | ❌                                                              |
+| **macOS**   |                             |                                                           |                                                                 |
+| Metal       | ✅ (via `metal` feature)    | ❌                                                        | ✅                                                              |
+| CoreML      | ✅ (via `coreml` feature)   | ❌                                                        | ✅                                                              |
+| **Android** |                             |                                                           |                                                                 |
+| NNAPI       | ✅ (via `nnapi` feature)    | ❌                                                        | ❌                                                              |
+| CPU         | ✅                          | ✅                                                        | ✅                                                              |
+| **iOS**     |                             |                                                           |                                                                 |
+| CoreML      | ✅ (via `coreml` feature)   | ❌                                                        | ✅                                                              |
+| CPU         | ✅                          | ✅                                                        | ✅                                                              |
 
-### 总览
+### 综合对比
 
-| 方面              | 本项目 (PaddleOCR-rs)                                                        | [paddle-ocr-rs](https://github.com/mg-chao/paddle-ocr-rs)         | [rust-paddle-ocr](https://github.com/zibo-chen/rust-paddle-ocr)   |
-| ----------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------- |
-| **推理后端**      | ONNX Runtime via ort crate（纯 Rust，无 FFI）                                | ONNX Runtime via ort crate                                        | MNN 推理框架 via mnn-rs crate                                     |
-| **文档方向分类**  | ✅ 包含（PP-LCNet 模型，自动旋转校正）                                       | ✅ 包含（PP-OCR mobile v2.0，180° 旋转）                          | ✅ 包含（PP-LCNet 模型，0/90/180/270° + 0/180°）                  |
-| **模型格式**      | 标准 ONNX 格式                                                               | 标准 ONNX 格式                                                    | MNN 模型格式                                                      |
-| **架构**          | 纯 Rust + ONNX Runtime                                                       | Rust + ONNX Runtime                                               | Rust + MNN 绑定                                                   |
-| **外部依赖**      | 轻量依赖集（ort + 核心库，无额外下载逻辑）                                   | 全功能依赖集（ort 显式启用自动下载 + YAML/JSON/reqwest 等）       | 需要 MNN 库（通过 mnn-rs）                                        |
-| **API 设计**      | OcrEngine 细粒度控制 + Result 错误处理 + 最小化设置                          | 丰富的流水线 API（YAML 配置、自动下载、单词级边框）               | 多层 API（Det/Rec、OcrEngine、C API）                             |
-| **部署与平台**    | ✅ 跨平台（Windows/Linux/macOS/Android/iOS），FFI 支持移动端，单一二进制文件 | 跨平台（ONNX Runtime 支持 Windows/Linux/macOS），自动下载外部依赖 | 跨平台（MNN 支持 Windows/Linux/macOS/Android/iOS），需要 MNN 环境 |
-| **文档方向分类**  | ✅ PP-LCNet 分类器（0/90/180/270°）                                          | ✅ PP-OCR v2.0 分类器（0/180°）                                   | ✅ PP-LCNet 分类器（0/90/180/270° + 0/180°）                      |
-| **并发能力**      | ✅ rayon 并行 + 会话池                                                       | ✅ rayon 并行 + 批量推理（识别/分类各 6 张）                      | ⚠️ 预处理/后处理使用 rayon，推理部分单线程                        |
-| **模型格式支持**  | ONNX 格式                                                                    | ONNX 格式                                                         | MNN 格式                                                          |
-| **外部接口**      | ✅ Rust API + C FFI API（通过 `ffi` feature）                                | ✅ YAML 配置 + CLI(rapidocr)                                      | ✅ C API(cdylib) + CLI(newbee-ocr-cli)                            |
-| **内存/类型安全** | ✅ 内存安全 Rust + 强类型                                                    | ✅ 内存安全 Rust + 强类型                                         | ✅ 内存安全 Rust（mnn-rs）+ ⚠️ C API 部分                         |
-| **并发安全性**    | ✅ 线程安全                                                                  | ✅ 线程安全                                                       | ⚠️ 需要小心处理                                                   |
+| 方面              | 本项目 (PaddleOCR-rs)                         | [paddle-ocr-rs](https://github.com/mg-chao/paddle-ocr-rs) | [rust-paddle-ocr](https://github.com/zibo-chen/rust-paddle-ocr) |
+| ----------------- | --------------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------- |
+| **模型格式支持**  | ✅ 仅 ONNX                                    | ✅ ONNX 格式                                              | ✅ MNN 格式                                                     |
+| **文档方向分类**  | PP-LCNet 分类器                               | PP-OCR v2.0 分类器                                        | PP-LCNet 分类器                                                 |
+| **并发能力**      | ✅ rayon 并行 + 会话池                        | ✅ rayon 并行 + 批量推理                                  | ⚠️ 预处理/后处理使用 rayon，推理部分单线程                      |
+| **外部接口**      | ✅ Rust API + C FFI API（通过 `ffi` feature） | ✅ YAML 配置 + CLI (rapidocr)                             | ✅ C API (cdylib) + CLI (newbee-ocr-cli)                        |
+| **文本处理**      | ✅ 排序模式（Horizontal/Vertical/Score）      | ✅ 词级边框 + BiDi 文本                                   | ✅ FP16 推理 + 异步支持                                         |
+| **内存/类型安全** | ✅ 内存安全 Rust + 强类型 + 自动内存管理      | ✅ 内存安全 Rust + 强类型                                 | ✅ 内存安全 Rust (mnn-rs) + ⚠️ C API 部分                       |
+| **并发安全性**    | ✅ 设计层面线程安全                           | ✅ 线程安全（Arc + Mutex）                                | ⚠️ 需要小心处理                                                 |
 
 ## 致谢
 
