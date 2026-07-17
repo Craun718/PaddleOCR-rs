@@ -122,7 +122,7 @@ This project is built upon the work of the following projects:
 
 - [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) - Provides models
 - [FastDeploy](https://github.com/PaddlePaddle/FastDeploy) - Provides runtime reference
-- [MAAFramework](https://github.com/MaaAssistantArknights/MAAFramework) - Provides architecture reference
+- [MaaFramework](https://github.com/MaaAssistantArknights/MAAFramework) - Provides architecture reference
 
 ## License
 

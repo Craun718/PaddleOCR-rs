@@ -122,7 +122,7 @@ PaddleOCR-rs 通过 C FFI 接口支持 Android 和 iOS 平台。
 
 - [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) - 提供模型
 - [FastDeploy](https://github.com/PaddlePaddle/FastDeploy) - 提供运行时参考
-- [MAAFramework](https://github.com/MaaAssistantArknights/MAAFramework) - 提供架构参考
+- [MaaFramework](https://github.com/MaaAssistantArknights/MAAFramework) - 提供架构参考
 
 ## 许可证
 
