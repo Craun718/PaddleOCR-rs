@@ -52,6 +52,29 @@ paddleocr_rs_onnx = { version = "0.1", features = ["cuda"] }
 paddleocr_rs_onnx = { version = "0.1", features = ["cuda", "directml"] }
 ```
 
+## Checking EP Availability
+
+Use `is_available()` to test whether a specific device can be used, and `available_devices()` to list all usable devices in the current environment:
+
+```rust
+use paddleocr_rs_onnx::AccelerationDevice;
+
+// Check a specific device
+if AccelerationDevice::Cuda.is_available() {
+    println!("CUDA is available");
+}
+
+// List all available devices
+let available = AccelerationDevice::available_devices();
+for device in &available {
+    println!("[available] {}", device);
+}
+```
+
+The check covers two layers:
+1. **Compile-time** — whether the corresponding Cargo feature is enabled
+2. **Runtime** — whether the ONNX Runtime execution provider can be initialized successfully
+
 ## Runtime Behavior
 
 If a requested EP is not available at runtime (not compiled into the ONNX Runtime binary, missing libraries, or unsupported platform), a warning is logged and inference falls back to CPU automatically.

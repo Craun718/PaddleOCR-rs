@@ -96,4 +96,8 @@ pub enum AccelerationDevice {
 }
 ```
 
-详见 [acceleration.md](acceleration.md) 了解平台要求和运行时行为。
+关键方法：
+- `is_available(&self) -> bool` — 检查设备是否可用（编译期 feature + 运行时 EP 检查）
+- `available_devices() -> Vec<AccelerationDevice>` — 列出当前环境下所有可用设备
+
+详见 [acceleration.md](acceleration.md) 了解平台要求、可用性检查和运行时行为。

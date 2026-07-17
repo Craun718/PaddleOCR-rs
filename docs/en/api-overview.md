@@ -96,4 +96,8 @@ pub enum AccelerationDevice {
 }
 ```
 
-See [acceleration.md](acceleration.md) for detailed platform requirements and runtime behavior.
+Key methods:
+- `is_available(&self) -> bool` — Check if the device is available (compile-time feature + runtime EP check)
+- `available_devices() -> Vec<AccelerationDevice>` — List all available devices in the current environment
+
+See [acceleration.md](acceleration.md) for detailed platform requirements, availability checking, and runtime behavior.

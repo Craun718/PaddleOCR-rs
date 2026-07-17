@@ -189,6 +189,25 @@ impl std::fmt::Display for AccelerationDevice {
     }
 }
 
+macro_rules! ep_available {
+    ($feature:literal, $ep:ty) => {{
+        #[cfg(feature = $feature)]
+        {
+            ort::session::Session::builder()
+                .ok()
+                .and_then(|b| {
+                    b.with_execution_providers([<$ep>::default().build()])
+                        .ok()
+                })
+                .is_some()
+        }
+        #[cfg(not(feature = $feature))]
+        {
+            false
+        }
+    }};
+}
+
 impl AccelerationDevice {
     /// Parse a device string (case-insensitive).
     ///
@@ -220,6 +239,67 @@ impl AccelerationDevice {
             "cann" | "ascend" | "huawei" => Some(Self::Cann),
             _ => None,
         }
+    }
+
+    /// Check if this acceleration device is available at runtime.
+    ///
+    /// Checks two conditions:
+    /// 1. The corresponding Cargo feature flag is enabled at compile time.
+    /// 2. The ONNX Runtime execution provider can be initialized (runtime check).
+    ///
+    /// `Cpu` is always available.
+    ///
+    /// # Returns
+    ///
+    /// `true` if the device is available for use.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use paddleocr_rs_onnx::AccelerationDevice;
+    ///
+    /// if AccelerationDevice::Cuda.is_available() {
+    ///     let engine = OcrEngine::new_with_device(&det, &rec, &keys, AccelerationDevice::Cuda)?;
+    /// }
+    /// ```
+    pub fn is_available(&self) -> bool {
+        match self {
+            Self::Cpu => true,
+            Self::DirectML => ep_available!("directml", ort::ep::DirectML),
+            Self::Cuda => ep_available!("cuda", ort::ep::CUDA),
+            Self::OpenVINO => ep_available!("openvino", ort::ep::OpenVINO),
+            Self::Nnapi => ep_available!("nnapi", ort::ep::NNAPI),
+            Self::Coreml => ep_available!("coreml", ort::ep::CoreML),
+            Self::Cann => ep_available!("cann", ort::ep::CANN),
+        }
+    }
+
+    /// List all acceleration devices available in the current environment.
+    ///
+    /// Returns a vector of [`AccelerationDevice`] variants that pass both the
+    /// compile-time feature check and the runtime EP availability check.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use paddleocr_rs_onnx::AccelerationDevice;
+    ///
+    /// let available = AccelerationDevice::available_devices();
+    /// for device in &available {
+    ///     println!("{} is available", device);
+    /// }
+    /// ```
+    pub fn available_devices() -> Vec<Self> {
+        let all = [
+            Self::Cpu,
+            Self::DirectML,
+            Self::Cuda,
+            Self::OpenVINO,
+            Self::Nnapi,
+            Self::Coreml,
+            Self::Cann,
+        ];
+        all.into_iter().filter(|d| d.is_available()).collect()
     }
 }
 

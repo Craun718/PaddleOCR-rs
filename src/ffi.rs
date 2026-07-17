@@ -715,14 +715,6 @@ pub unsafe extern "C" fn paddle_ocr_is_device_available(device: u32) -> i32 {
         _ => return 0,
     };
 
-    // CPU is always available
-    if matches!(accel_device, AccelerationDevice::Cpu) {
-        return 1;
-    }
-
-    // Try to create a session builder to check availability
-    // This is a heuristic - the actual availability depends on runtime
-    // For now, we return 1 for all devices and let the engine handle fallback
-    1
+    accel_device.is_available() as i32
 }
 

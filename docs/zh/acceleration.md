@@ -52,6 +52,29 @@ paddleocr_rs_onnx = { version = "0.1", features = ["cuda"] }
 paddleocr_rs_onnx = { version = "0.1", features = ["cuda", "directml"] }
 ```
 
+## 检查 EP 可用性
+
+使用 `is_available()` 测试指定设备是否可用，`available_devices()` 列出当前环境下所有可用设备：
+
+```rust
+use paddleocr_rs_onnx::AccelerationDevice;
+
+// 检查指定设备
+if AccelerationDevice::Cuda.is_available() {
+    println!("CUDA 可用");
+}
+
+// 列出所有可用设备
+let available = AccelerationDevice::available_devices();
+for device in &available {
+    println!("[可用] {}", device);
+}
+```
+
+检查包含两层：
+1. **编译期** — 对应的 Cargo feature 是否已启用
+2. **运行时** — ONNX Runtime 执行提供程序能否成功初始化
+
 ## 运行时行为
 
 如果请求的 EP 在运行时不可用（未编译到 ORT 二进制文件中、缺少运行时库或不支持当前平台），会记录警告日志并自动回退到 CPU 推理。
