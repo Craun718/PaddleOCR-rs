@@ -1132,7 +1132,7 @@ dependencies = [
 
 [[package]]
 name = "paddleocr_rs_onnx"
-version = "0.2.4-beta.6"
+version = "0.2.7"
 dependencies = [
  "geo",
  "image",
