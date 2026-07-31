@@ -20,7 +20,9 @@ ffi = []
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
-ort = "2.0.0-rc.12"
+# load-dynamic: keep the Rust ndarray/api-24 bindings from ort's default
+# features, but skip static linking; the runtime dylib is bundled via build.rs.
+ort = { version = "2.0.0-rc.12", features = ["load-dynamic"] }
 image = "0.25"
 imageproc = "0.27"
 geo = "0.33"
