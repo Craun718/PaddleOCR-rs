@@ -1,0 +1,3 @@
+[env]
+# Match the minimum iOS version of ort's prebuilt ONNX Runtime libraries.
+IPHONEOS_DEPLOYMENT_TARGET = "15.1"

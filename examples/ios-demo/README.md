@@ -6,6 +6,11 @@ This example demonstrates how to use PaddleOCR-rs in an iOS application via Swif
 
 ## Prerequisites
 
+The prebuilt ONNX Runtime libraries require iOS 15.1 or later. Set your Xcode
+deployment target to at least 15.1. This repository configures Cargo builds via
+`.cargo/config.toml`; when building from another project, set
+`IPHONEOS_DEPLOYMENT_TARGET=15.1` (or a higher version) in that environment too.
+
 1. Xcode 14 or later
 2. Rust toolchain with iOS targets:
    ```bash

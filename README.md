@@ -61,6 +61,7 @@ PaddleOCR-rs supports Android and iOS platforms via C FFI interface.
 
 ### iOS
 
+- **Minimum version**: iOS 15.1 (set `IPHONEOS_DEPLOYMENT_TARGET=15.1` when building in a consuming project)
 - **CPU**: ✅ Supported (via ONNX Runtime)
 - **CoreML**: ✅ Supported (via coreml feature)
 - **Targets**: aarch64-apple-ios, aarch64-apple-ios-sim

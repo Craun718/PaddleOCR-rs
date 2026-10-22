@@ -61,6 +61,7 @@ PaddleOCR-rs 通过 C FFI 接口支持 Android 和 iOS 平台。
 
 ### iOS
 
+- **最低版本**：iOS 15.1（在使用本库的项目中构建时，设置 `IPHONEOS_DEPLOYMENT_TARGET=15.1`）
 - **CPU**: ✅ 支持（通过 ONNX Runtime）
 - **CoreML**: ✅ 支持（通过 coreml feature）
 - **Targets**: aarch64-apple-ios、aarch64-apple-ios-sim
