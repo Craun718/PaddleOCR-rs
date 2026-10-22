@@ -189,11 +189,59 @@ impl std::fmt::Display for AccelerationDevice {
     }
 }
 
+// ort permits a single environment per process; retain it across all engines,
+// classifiers, and availability probes, including concurrent initialization.
+fn session_builder() -> ort::Result<ort::session::builder::SessionBuilder> {
+    static ENVIRONMENT: Mutex<Option<ort::environment::Environment>> = Mutex::new(None);
+    let mut environment = ENVIRONMENT.lock();
+    if environment.is_none() {
+        *environment = Some(ort::init().build()?);
+    }
+    ort::session::Session::builder(environment.as_ref().unwrap())
+}
+
+#[cfg(test)]
+mod runtime_tests {
+    use super::*;
+
+    #[test]
+    fn concurrent_session_builders_share_environment() {
+        std::thread::scope(|scope| {
+            let handles: Vec<_> = (0..4)
+                .map(|_| scope.spawn(|| {
+                    session_builder().unwrap();
+                    session_builder().unwrap();
+                }))
+                .collect();
+            for handle in handles {
+                handle.join().unwrap();
+            }
+        });
+    }
+
+    #[test]
+    fn disabled_acceleration_features_fall_back_to_cpu() {
+        for (device, enabled) in [
+            (AccelerationDevice::DirectML, cfg!(feature = "directml")),
+            (AccelerationDevice::Cuda, cfg!(feature = "cuda")),
+            (AccelerationDevice::OpenVINO, cfg!(feature = "openvino")),
+            (AccelerationDevice::Nnapi, cfg!(feature = "nnapi")),
+            (AccelerationDevice::Coreml, cfg!(feature = "coreml")),
+            (AccelerationDevice::Cann, cfg!(feature = "cann")),
+        ] {
+            if !enabled {
+                assert!(!device.is_available());
+                configure_session_builder(session_builder().unwrap(), device).unwrap();
+            }
+        }
+    }
+}
+
 macro_rules! ep_available {
     ($feature:literal, $ep:ty) => {{
         #[cfg(feature = $feature)]
         {
-            ort::session::Session::builder()
+            session_builder()
                 .ok()
                 .and_then(|b| {
                     b.with_execution_providers([<$ep>::default().build()])
@@ -312,74 +360,36 @@ fn configure_session_builder(
     builder: ort::session::builder::SessionBuilder,
     device: AccelerationDevice,
 ) -> Result<ort::session::builder::SessionBuilder, PaddleOcrError> {
+    macro_rules! configure_ep {
+        ($feature:literal, $ep:ty) => {{
+            #[cfg(feature = $feature)]
+            {
+                info!("[ep] configuring {} execution provider", device);
+                let ep = <$ep>::default().build();
+                match builder.clone().with_execution_providers([ep]) {
+                    Ok(b) => Ok(b),
+                    Err(e) => {
+                        warn!("[ep] {} unavailable, falling back to CPU: {}", device, e);
+                        Ok(builder)
+                    }
+                }
+            }
+            #[cfg(not(feature = $feature))]
+            {
+                warn!("[ep] {} feature disabled, falling back to CPU", device);
+                Ok(builder)
+            }
+        }};
+    }
+
     match device {
         AccelerationDevice::Cpu => Ok(builder),
-        AccelerationDevice::DirectML => {
-            info!("[ep] configuring DirectML execution provider");
-            let ep = ort::ep::DirectML::default().build();
-            match builder.clone().with_execution_providers([ep]) {
-                Ok(b) => Ok(b),
-                Err(e) => {
-                    warn!("[ep] DirectML unavailable, falling back to CPU: {}", e);
-                    Ok(builder)
-                }
-            }
-        }
-        AccelerationDevice::Cuda => {
-            info!("[ep] configuring CUDA execution provider");
-            let ep = ort::ep::CUDA::default().build();
-            match builder.clone().with_execution_providers([ep]) {
-                Ok(b) => Ok(b),
-                Err(e) => {
-                    warn!("[ep] CUDA unavailable, falling back to CPU: {}", e);
-                    Ok(builder)
-                }
-            }
-        }
-        AccelerationDevice::OpenVINO => {
-            info!("[ep] configuring OpenVINO execution provider");
-            let ep = ort::ep::OpenVINO::default().build();
-            match builder.clone().with_execution_providers([ep]) {
-                Ok(b) => Ok(b),
-                Err(e) => {
-                    warn!("[ep] OpenVINO unavailable, falling back to CPU: {}", e);
-                    Ok(builder)
-                }
-            }
-        }
-        AccelerationDevice::Nnapi => {
-            info!("[ep] configuring NNAPI execution provider");
-            let ep = ort::ep::NNAPI::default().build();
-            match builder.clone().with_execution_providers([ep]) {
-                Ok(b) => Ok(b),
-                Err(e) => {
-                    warn!("[ep] NNAPI unavailable, falling back to CPU: {}", e);
-                    Ok(builder)
-                }
-            }
-        }
-        AccelerationDevice::Coreml => {
-            info!("[ep] configuring CoreML execution provider");
-            let ep = ort::ep::CoreML::default().build();
-            match builder.clone().with_execution_providers([ep]) {
-                Ok(b) => Ok(b),
-                Err(e) => {
-                    warn!("[ep] CoreML unavailable, falling back to CPU: {}", e);
-                    Ok(builder)
-                }
-            }
-        }
-        AccelerationDevice::Cann => {
-            info!("[ep] configuring CANN execution provider");
-            let ep = ort::ep::CANN::default().build();
-            match builder.clone().with_execution_providers([ep]) {
-                Ok(b) => Ok(b),
-                Err(e) => {
-                    warn!("[ep] CANN unavailable, falling back to CPU: {}", e);
-                    Ok(builder)
-                }
-            }
-        }
+        AccelerationDevice::DirectML => configure_ep!("directml", ort::ep::DirectML),
+        AccelerationDevice::Cuda => configure_ep!("cuda", ort::ep::CUDA),
+        AccelerationDevice::OpenVINO => configure_ep!("openvino", ort::ep::OpenVINO),
+        AccelerationDevice::Nnapi => configure_ep!("nnapi", ort::ep::NNAPI),
+        AccelerationDevice::Coreml => configure_ep!("coreml", ort::ep::CoreML),
+        AccelerationDevice::Cann => configure_ep!("cann", ort::ep::CANN),
     }
 }
 
@@ -503,9 +513,9 @@ impl OcrEngine {
     ) -> Result<Self, PaddleOcrError> {
         info!("[ocr] creating engine with device: {}", device);
 
-        let det_session = configure_session_builder(ort::session::Session::builder()?, device)?
+        let det_session = configure_session_builder(session_builder()?, device)?
             .commit_from_memory(det_model)?;
-        let rec_session = configure_session_builder(ort::session::Session::builder()?, device)?
+        let rec_session = configure_session_builder(session_builder()?, device)?
             .commit_from_memory(rec_model)?;
 
         let det_input = det_session.inputs()[0].name().to_string();
@@ -567,7 +577,7 @@ impl OcrEngine {
         sessions.push_back(rec_session);
         for _ in 1..pool_size {
             sessions.push_back(
-                configure_session_builder(ort::session::Session::builder()?, device)?
+                configure_session_builder(session_builder()?, device)?
                     .commit_from_memory(rec_model)?,
             );
         }
@@ -943,7 +953,7 @@ impl DocOrientationClassifier {
     pub fn new_with_device(model_data: &[u8], device: AccelerationDevice) -> Result<Self, PaddleOcrError> {
         info!("[doc_ori] creating classifier with device: {}", device);
 
-        let session = configure_session_builder(ort::session::Session::builder()?, device)?
+        let session = configure_session_builder(session_builder()?, device)?
             .commit_from_memory(model_data)?;
 
         let input_name = session.inputs()[0].name().to_string();

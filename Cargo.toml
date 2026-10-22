@@ -2,6 +2,7 @@
 name = "paddleocr_rs_onnx"
 version = "0.2.7"
 edition = "2021"
+rust-version = "1.92"
 repository = "https://github.com/Craun718/PaddleOCR-rs"
 license = "MIT"
 authors = ["Craun718 <3653544699@qq.com>"]
@@ -24,13 +25,13 @@ ffi = []
 crate-type = ["lib", "cdylib", "staticlib"]
 
 [dependencies]
-ort = "2.0.0-rc.12"
+ort = "2.0.0-rc.15"
 image = "0.25"
 imageproc = "0.27"
 geo = "0.33"
 serde = { version = "1", features = ["derive"] }
 rayon = "1"
 log = "0.4"
-parking_lot = "0.12"
+parking_lot = "0.13"
 
 thiserror = "2.0"

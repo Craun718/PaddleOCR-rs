@@ -34,6 +34,8 @@ for block in &blocks {
 
 ## Installation
 
+Requires Rust 1.92 or later.
+
 ```toml
 [dependencies]
 paddleocr_rs_onnx = "0.2"
